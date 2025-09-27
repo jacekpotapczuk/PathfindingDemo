@@ -16,6 +16,7 @@ namespace PathfindingDemo
         public Vector2Int Position { get; private set; }
         public TileType Type { get; set; }
         public GameObject TileObject { get; set; }
+        public ITileOccupant OccupiedBy { get; private set; }
 
         private readonly List<TileData> neighbors = new List<TileData>(4);
 
@@ -58,9 +59,42 @@ namespace PathfindingDemo
             return Type == TileType.Traversable || Type == TileType.Cover;
         }
 
+        public bool IsOccupied()
+        {
+            return OccupiedBy != null;
+        }
+
+        public bool CanBeOccupied()
+        {
+            return IsTraversable() && !IsOccupied();
+        }
+
+        public void SetOccupant(ITileOccupant occupant)
+        {
+            if (occupant == null)
+            {
+                Debug.LogError("Cannot set null occupant");
+                return;
+            }
+
+            if (!CanBeOccupied())
+            {
+                Debug.LogError($"Tile {Position} cannot be occupied - Type: {Type}, Occupied: {IsOccupied()}");
+                return;
+            }
+
+            OccupiedBy = occupant;
+        }
+
+        public void RemoveOccupant()
+        {
+            OccupiedBy = null;
+        }
+
         public override string ToString()
         {
-            return $"Tile({Position.x}, {Position.y}) - {Type}";
+            var occupantInfo = IsOccupied() ? " [Occupied]" : "";
+            return $"Tile({Position.x}, {Position.y}) - {Type}{occupantInfo}";
         }
     }
 }
