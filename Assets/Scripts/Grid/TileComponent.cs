@@ -28,24 +28,5 @@ namespace PathfindingDemo
 
             gridGenerator.SetTileType(tileData.Position, nextType);
         }
-
-        private void OnDrawGizmosSelected()
-        {
-            if (tileData == null) return;
-
-            // Draw connections to neighbors
-            Gizmos.color = Color.yellow;
-            foreach (var neighbor in tileData.GetNeighbors())
-            {
-                if (neighbor?.TileObject != null)
-                {
-                    Gizmos.DrawLine(transform.position, neighbor.TileObject.transform.position);
-                }
-            }
-
-            // Draw position info
-            Gizmos.color = Color.red;
-            Gizmos.DrawWireSphere(transform.position + Vector3.up * 0.5f, 0.1f);
-        }
     }
 }

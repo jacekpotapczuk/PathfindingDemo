@@ -8,6 +8,14 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: -5283116753132635417, guid: 056832bb1ef63574387859c67c8d6b8c, type: 3}
+      propertyPath: moveRange
+      value: 5
+      objectReference: {fileID: 0}
+    - target: {fileID: -5283116753132635417, guid: 056832bb1ef63574387859c67c8d6b8c, type: 3}
+      propertyPath: attackRange
+      value: 15
+      objectReference: {fileID: 0}
     - target: {fileID: 156407523484606143, guid: 056832bb1ef63574387859c67c8d6b8c, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0

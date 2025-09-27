@@ -12,8 +12,8 @@ namespace PathfindingDemo
     {
         [Header("Unit Settings")]
         [SerializeField] private UnitType unitType = UnitType.Player;
-        [SerializeField] private int moveRange = 3;
-        [SerializeField] private int attackRange = 2;
+        [SerializeField] private int moveRange = 4;
+        [SerializeField] private int attackRange = 4;
 
         private TileData currentTile;
 
@@ -79,23 +79,6 @@ namespace PathfindingDemo
         private void OnDestroy()
         {
             RemoveFromTile();
-        }
-
-        private void OnDrawGizmosSelected()
-        {
-            if (currentTile == null) return;
-
-            // Draw move range
-            Gizmos.color = Color.blue;
-            Gizmos.DrawWireSphere(transform.position, moveRange + 0.5f);
-
-            // Draw attack range
-            Gizmos.color = Color.red;
-            Gizmos.DrawWireSphere(transform.position, attackRange + 0.5f);
-
-            // Draw unit info
-            Gizmos.color = unitType == UnitType.Player ? Color.green : Color.red;
-            Gizmos.DrawWireCube(transform.position + Vector3.up, Vector3.one * 0.5f);
         }
 
         public override string ToString()

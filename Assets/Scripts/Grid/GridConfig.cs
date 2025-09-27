@@ -20,7 +20,6 @@ namespace PathfindingDemo
 
         [Header("Generation Settings")]
         [SerializeField] private bool generateOnStart = true;
-        [SerializeField] private bool showGridGizmos = true;
 
         [Header("Random Generation")]
         [SerializeField] private bool useRandomGeneration = false;
@@ -35,7 +34,6 @@ namespace PathfindingDemo
         public Material ObstacleMaterial => obstacleMaterial;
         public Material CoverMaterial => coverMaterial;
         public bool GenerateOnStart => generateOnStart;
-        public bool ShowGridGizmos => showGridGizmos;
         public bool UseRandomGeneration => useRandomGeneration;
         public float ObstacleChance => obstacleChance;
         public float CoverChance => coverChance;

@@ -170,25 +170,5 @@ namespace PathfindingDemo
             gridHeight = Mathf.Max(1, gridHeight);
             tileSize = Mathf.Max(0.1f, tileSize);
         }
-
-        private void OnDrawGizmos()
-        {
-            if (grid == null) return;
-
-            Gizmos.color = Color.white;
-            for (int x = 0; x <= gridWidth; x++)
-            {
-                Vector3 start = new Vector3(x * tileSize, 0f, 0f);
-                Vector3 end = new Vector3(x * tileSize, 0f, gridHeight * tileSize);
-                Gizmos.DrawLine(start, end);
-            }
-
-            for (int y = 0; y <= gridHeight; y++)
-            {
-                Vector3 start = new Vector3(0f, 0f, y * tileSize);
-                Vector3 end = new Vector3(gridWidth * tileSize, 0f, y * tileSize);
-                Gizmos.DrawLine(start, end);
-            }
-        }
     }
 }

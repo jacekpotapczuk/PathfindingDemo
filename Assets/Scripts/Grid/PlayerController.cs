@@ -14,6 +14,8 @@ namespace PathfindingDemo
         private Camera playerCamera;
         private TileComponent hoveredTileComponent;
         private GridGenerator gridGenerator;
+        private PathVisualizer pathVisualizer;
+        private UnitComponent playerUnit;
 
         private void Start()
         {
@@ -24,6 +26,15 @@ namespace PathfindingDemo
             }
 
             gridGenerator = FindFirstObjectByType<GridGenerator>();
+
+            // Create or find path visualizer
+            pathVisualizer = FindFirstObjectByType<PathVisualizer>();
+            if (pathVisualizer == null)
+            {
+                var visualizerObject = new GameObject("PathVisualizer");
+                pathVisualizer = visualizerObject.AddComponent<PathVisualizer>();
+            }
+
             Cursor.visible = true;
             Cursor.lockState = CursorLockMode.None;
 
@@ -66,6 +77,11 @@ namespace PathfindingDemo
             if (Input.GetMouseButtonDown(0) && hoveredTileComponent != null)
             {
                 hoveredTileComponent.CycleTileType();
+            }
+
+            if (Input.GetMouseButtonDown(1) && hoveredTileComponent != null)
+            {
+                ShowPathToTile(hoveredTileComponent.TileData);
             }
         }
 
@@ -110,6 +126,12 @@ namespace PathfindingDemo
             // unitTypeField?.SetValue(unitComponent, unitType);
 
             unitComponent.SetTile(randomTile);
+
+            // Store reference to player unit
+            if (unitType == UnitType.Player)
+            {
+                playerUnit = unitComponent;
+            }
         }
 
         private TileData GetRandomTraversableTile()
@@ -133,6 +155,55 @@ namespace PathfindingDemo
                 return null;
 
             return availableTiles[Random.Range(0, availableTiles.Count)];
+        }
+
+        private void ShowPathToTile(TileData targetTile)
+        {
+            if (playerUnit == null || playerUnit.CurrentTile == null)
+            {
+                Debug.LogWarning("PlayerController: No player unit found for pathfinding");
+                pathVisualizer?.HidePath();
+                return;
+            }
+
+            if (targetTile == null)
+            {
+                pathVisualizer?.HidePath();
+                return;
+            }
+
+            var startTile = playerUnit.CurrentTile;
+
+            // Determine path type: attack if tile has enemy, movement otherwise
+            var pathType = PathType.Movement;
+            int maxRange = playerUnit.MoveRange;
+
+            if (targetTile.IsOccupied() && targetTile.OccupiedBy is UnitComponent targetUnit)
+            {
+                if (targetUnit.Type == UnitType.Enemy)
+                {
+                    pathType = PathType.Attack;
+                    maxRange = playerUnit.AttackRange;
+                }
+            }
+
+            // Calculate path using new pathfinding service
+            var path = PathfindingService.FindPath(gridGenerator.Grid, startTile, targetTile, pathType);
+
+            if (path.Count == 0)
+            {
+                Debug.Log($"No path found from {startTile.Position} to {targetTile.Position}");
+                pathVisualizer?.HidePath();
+                return;
+            }
+
+            // Show path with range validation
+            pathVisualizer?.ShowPath(path, maxRange, pathType);
+
+            // Log path information
+            bool inRange = PathfindingService.IsPathInRange(path, maxRange);
+            Debug.Log($"Path found: {pathType} path with {path.Count} tiles " +
+                     $"(Range: {maxRange}, In range: {inRange})");
         }
     }
 }
