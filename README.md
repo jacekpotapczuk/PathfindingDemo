@@ -47,7 +47,7 @@ The main goal is to showcase a clean pathfinding implementation, unit movement w
 
 ## Pathfinding Algorithm Choice
 
-I considered three algorithms:
+I considered a couple of algorithms:
 
 - **BFS (Breadth-First Search)**
   - Simple, low overhead.
@@ -56,18 +56,25 @@ I considered three algorithms:
 
 - **JPS (Jump Point Search)**
   - More efficient on large, open grids.
-  - Would require a different architecture (tiles not being individual GameObjects).
-  - Overkill for this project’s grid size.
+  - Overkill if grid isn't enormous (and that would bring other problems like each tile having it's own Game Object).
 
-- **A\*** (chosen)
+- A\* (chosen for simple movement paths)
   - Standard for pathfinding.
-  - Efficient for medium-sized grids.
+  - Efficient for standard-sized grids in games.
   - Outperforms BFS in average cases with heuristic guidance.
-  - Flexible if we want to extend with weighted costs later.
+  - Used for basic movement pathfinding and single-target paths.
+
+- **Bidirectional BFS** (chosen for movement + attack scenarios)
+  - Pretty late I realized how bad A* is for searching move+attack paths. So I switched to Bidirectional BFS (over x10 performance improvement) 
+  - Optimized algorithm for finding best attack positions.
+  - One BFS expands from enemy position to find all valid attack tiles.
+  - Another BFS expands from player position until it intersects with attack tiles.
+  - Provides automatic early termination when searches meet.
 
 **Adjustments made:**
-- Straightforward implementation of A\* on an orthogonal grid.
-- Path visualization is extended to support multi-turn moves → paths beyond `MoveRange`/`AttackRange` are segmented and color-coded to indicate how many turns would be required.
+- A\* implementation on orthogonal grid for movement pathfinding.
+- Bidirectional BFS for complex movement + attack position finding.
+- Path visualization extended to support multi-turn moves → paths beyond `MoveRange`/`AttackRange` are segmented and color-coded to indicate turn requirements.
 
 ---
 

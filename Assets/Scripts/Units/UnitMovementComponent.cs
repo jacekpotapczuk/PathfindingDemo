@@ -170,7 +170,7 @@ namespace PathfindingDemo
             if (!animator) return;
 
             animator.SetFloat(_animIDSpeed, speed);
-            animator.SetFloat(_animIDMotionSpeed, 1f);
+            animator.SetFloat(_animIDMotionSpeed, speed > 0f ? 1f : 0f);
         }
 
         private void AssignAnimationIDs()

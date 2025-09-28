@@ -9,6 +9,12 @@ namespace PathfindingDemo
     /// </summary>
     public static class PathfindingService
     {
+        // Simple cache for pathfinding results to avoid duplicate calculations in same frame
+        private static readonly Dictionary<(TileData start, TileData end, PathType type), List<TileData>> pathCache =
+            new Dictionary<(TileData, TileData, PathType), List<TileData>>();
+        
+        private static int lastClearFrame = -1;
+        
         public static List<TileData> FindPath(Grid grid, TileData start, TileData target, PathType pathType)
         {
             if (grid == null || start == null || target == null)
@@ -20,6 +26,16 @@ namespace PathfindingDemo
             if (start == target)
                 return new List<TileData> { start };
 
+            // Clear cache if we're in a new frame (prevents stale cache data)
+            ClearCacheIfNeeded();
+
+            // Check cache first
+            var cacheKey = (start, target, pathType);
+            if (pathCache.TryGetValue(cacheKey, out var cachedPath))
+            {
+                return new List<TileData>(cachedPath); // Return copy to prevent modification
+            }
+
             ResetTilePathfindingData(start);
             ResetTilePathfindingData(target);
             SetWalkabilityContext(grid, pathType);
@@ -27,17 +43,33 @@ namespace PathfindingDemo
             var pathfinder = new AStarPathfinder();
             var nodePath = pathfinder.GetPath(start, target);
 
-            if (nodePath == null || nodePath.Count == 0)
-                return new List<TileData>();
-
             var tilePath = new List<TileData>();
-            foreach (var node in nodePath)
+            if (nodePath != null && nodePath.Count > 0)
             {
-                if (node is TileData tileData)
-                    tilePath.Add(tileData);
+                foreach (var node in nodePath)
+                {
+                    if (node is TileData tileData)
+                        tilePath.Add(tileData);
+                }
             }
 
+            // Cache the result
+            pathCache[cacheKey] = new List<TileData>(tilePath);
+
             return tilePath;
+        }
+
+        /// <summary>
+        /// Clears the pathfinding cache when we enter a new frame to prevent stale data.
+        /// </summary>
+        private static void ClearCacheIfNeeded()
+        {
+            var currentFrame = Time.frameCount;
+            if (currentFrame != lastClearFrame)
+            {
+                pathCache.Clear();
+                lastClearFrame = currentFrame;
+            }
         }
 
         public static bool IsPathInRange(List<TileData> path, int maxRange, PathType pathType = PathType.Movement)
@@ -78,8 +110,8 @@ namespace PathfindingDemo
         }
 
         /// <summary>
-        /// Finds the best attack position for targeting an enemy. Returns the optimal position
-        /// within attack range that is reachable via movement and provides the shortest path.
+        /// Finds the best attack position using bidirectional BFS algorithm.
+        /// Searches from enemy (attack range) and player (movement) until they meet.
         /// </summary>
         public static TileData FindBestAttackPosition(Grid grid, TileData start, TileData target, int attackRange)
         {
@@ -89,48 +121,107 @@ namespace PathfindingDemo
                 return null;
             }
 
-            var attackPositions = new List<TileData>();
-            for (var dx = -attackRange; dx <= attackRange; dx++)
-            {
-                for (var dy = -attackRange; dy <= attackRange; dy++)
-                {
-                    var manhattanDistance = Mathf.Abs(dx) + Mathf.Abs(dy);
-                    if (manhattanDistance > 0 && manhattanDistance <= attackRange)
-                    {
-                        var x = target.Position.x + dx;
-                        var y = target.Position.y + dy;
+            // Step 1: BFS from enemy to find all valid attack positions
+            var attackPositions = GetAttackPositionsBFS(grid, target, attackRange);
+            if (attackPositions.Count == 0)
+                return null;
 
-                        if (x >= 0 && x < grid.Width && y >= 0 && y < grid.Height)
+            // Step 2: Expanding BFS from player until we hit an attack position
+            return FindNearestAttackPositionBFS(grid, start, attackPositions);
+        }
+
+        /// <summary>
+        /// Uses BFS to find all positions from which the enemy can be attacked.
+        /// </summary>
+        private static HashSet<TileData> GetAttackPositionsBFS(Grid grid, TileData enemyPosition, int attackRange)
+        {
+            var attackPositions = new HashSet<TileData>();
+            var visited = new HashSet<TileData>();
+            var queue = new Queue<(TileData tile, int distance)>();
+
+            queue.Enqueue((enemyPosition, 0));
+            visited.Add(enemyPosition);
+
+            while (queue.Count > 0)
+            {
+                var (currentTile, distance) = queue.Dequeue();
+
+                // If within attack range and not the enemy position itself
+                if (distance > 0 && distance <= attackRange && currentTile.CanBeOccupied())
+                {
+                    attackPositions.Add(currentTile);
+                }
+
+                // Continue BFS if we haven't reached max attack range
+                if (distance < attackRange)
+                {
+                    foreach (var neighbor in currentTile.GetNeighbors())
+                    {
+                        if (!visited.Contains(neighbor) && neighbor.CanAttackThrough())
                         {
-                            var tile = grid.GetTile(x, y);
-                            if (tile != null && tile.CanBeOccupied())
-                            {
-                                var attackPath = FindPath(grid, tile, target, PathType.Attack);
-                                if (attackPath.Count > 0 && IsPathInRange(attackPath, attackRange, PathType.Attack))
-                                    attackPositions.Add(tile);
-                            }
+                            visited.Add(neighbor);
+                            queue.Enqueue((neighbor, distance + 1));
                         }
                     }
                 }
             }
 
-            if (attackPositions.Count == 0)
-                return null;
+            return attackPositions;
+        }
 
-            TileData bestPosition = null;
-            var shortestDistance = int.MaxValue;
+        /// <summary>
+        /// Uses expanding BFS from player position to find the nearest attack position.
+        /// </summary>
+        private static TileData FindNearestAttackPositionBFS(Grid grid, TileData playerPosition, HashSet<TileData> attackPositions)
+        {
+            var visited = new HashSet<TileData>();
+            var queue = new Queue<(TileData tile, int distance)>();
 
-            foreach (var attackPos in attackPositions)
+            queue.Enqueue((playerPosition, 0));
+            visited.Add(playerPosition);
+
+            while (queue.Count > 0)
             {
-                var movementPath = FindPath(grid, start, attackPos, PathType.Movement);
-                if (movementPath.Count > 0 && movementPath.Count < shortestDistance)
+                var (currentTile, distance) = queue.Dequeue();
+
+                // Check if current tile is a valid attack position
+                if (distance > 0 && attackPositions.Contains(currentTile))
                 {
-                    shortestDistance = movementPath.Count;
-                    bestPosition = attackPos;
+                    return currentTile; // Found the nearest attack position!
+                }
+
+                // Continue BFS expansion
+                foreach (var neighbor in currentTile.GetNeighbors())
+                {
+                    if (!visited.Contains(neighbor) && neighbor.CanMoveThrough())
+                    {
+                        visited.Add(neighbor);
+                        queue.Enqueue((neighbor, distance + 1));
+                    }
                 }
             }
 
-            return bestPosition;
+            return null; // No reachable attack position found
+        }
+
+
+
+        /// <summary>
+        /// Fast attack validation using Manhattan distance instead of expensive pathfinding.
+        /// Works for grid-based tactical games where attack paths follow movement rules.
+        /// </summary>
+        private static bool CanAttackFromPosition(TileData attackPos, TileData target, int attackRange)
+        {
+            var distance = GetManhattanDistance(attackPos, target);
+            return distance <= attackRange;
+        }
+
+        /// <summary>
+        /// Helper method to calculate Manhattan distance between two tiles.
+        /// </summary>
+        private static int GetManhattanDistance(TileData tile1, TileData tile2)
+        {
+            return Mathf.Abs(tile1.Position.x - tile2.Position.x) + Mathf.Abs(tile1.Position.y - tile2.Position.y);
         }
 
         /// <summary>

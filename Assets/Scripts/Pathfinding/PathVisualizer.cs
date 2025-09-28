@@ -15,12 +15,10 @@ namespace PathfindingDemo
         [SerializeField] private float pathHeight = 0.1f;
         [SerializeField] private int poolSize = 50;
 
-        private List<TileData> currentPath = new List<TileData>();
         private PathType currentPathType = PathType.Movement;
-        private bool showPath = false;
 
-        private List<GameObject> pathTilePool = new List<GameObject>();
-        private List<GameObject> activeTiles = new List<GameObject>();
+        private readonly List<GameObject> pathTilePool = new List<GameObject>();
+        private readonly List<GameObject> activeTiles = new List<GameObject>();
 
         private void Start()
         {
@@ -107,9 +105,7 @@ namespace PathfindingDemo
             }
 
             HidePath();
-            currentPath = new List<TileData>(path);
             currentPathType = pathType;
-            showPath = true;
 
             var inRangePath = PathfindingService.GetInRangePath(path, maxRange, pathType);
 
@@ -133,8 +129,6 @@ namespace PathfindingDemo
             {
                 return;
             }
-
-            showPath = true;
 
             // Show each turn segment with appropriate material
             foreach (var (segment, turnNumber) in turnSegments)
@@ -193,9 +187,6 @@ namespace PathfindingDemo
 
         private void HidePath()
         {
-            showPath = false;
-            currentPath.Clear();
-
             foreach (var tile in activeTiles)
             {
                 if (tile != null)
