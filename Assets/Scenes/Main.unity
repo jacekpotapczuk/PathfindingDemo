@@ -1559,6 +1559,55 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 812149803}
   m_CullTransparentMesh: 1
+--- !u!1 &846674991
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 846674993}
+  - component: {fileID: 846674992}
+  m_Layer: 0
+  m_Name: PathVisualizer
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &846674992
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 846674991}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 533f8bdc73fe7804cb1c3075d463d71f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  inRangeMaterial: {fileID: 2100000, guid: e65f8f36300839844aa0a6c9c4aa01df, type: 2}
+  outOfRangeMaterial: {fileID: 2100000, guid: 6d2fc150855a214488320baab08e78df, type: 2}
+  attackPathMaterial: {fileID: 2100000, guid: 4605428e556cc07408cbefbda05078f7, type: 2}
+  pathHeight: 0.5
+  poolSize: 64
+--- !u!4 &846674993
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 846674991}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &872053212
 GameObject:
   m_ObjectHideFlags: 0
@@ -3401,3 +3450,4 @@ SceneRoots:
   - {fileID: 150197463}
   - {fileID: 262779887}
   - {fileID: 199653820}
+  - {fileID: 846674993}
