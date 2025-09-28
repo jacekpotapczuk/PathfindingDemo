@@ -24,6 +24,26 @@ namespace PathfindingDemo
         private void Start()
         {
             InitializePathTilePool();
+            SubscribeToEvents();
+        }
+
+        private void OnDestroy()
+        {
+            UnsubscribeFromEvents();
+        }
+
+        private void SubscribeToEvents()
+        {
+            PlayerController.OnPathCalculated += ShowPath;
+            PlayerController.OnMoveToAttackPathCalculated += ShowMoveToAttackPath;
+            PlayerController.OnPathHidden += HidePath;
+        }
+
+        private void UnsubscribeFromEvents()
+        {
+            PlayerController.OnPathCalculated -= ShowPath;
+            PlayerController.OnMoveToAttackPathCalculated -= ShowMoveToAttackPath;
+            PlayerController.OnPathHidden -= HidePath;
         }
 
         private void InitializePathTilePool()
@@ -94,7 +114,7 @@ namespace PathfindingDemo
             return CreatePathTile(pathTilePool.Count);
         }
 
-        public void ShowPath(List<TileData> path, int maxRange, PathType pathType)
+        public void ShowPath(List<TileData> path, PathType pathType, int maxRange)
         {
             if (path == null || path.Count == 0)
             {
@@ -118,6 +138,49 @@ namespace PathfindingDemo
                      $"(In range: {inRangePath.Count}, Out of range: {outOfRangePath.Count})");
         }
 
+        public void ShowMoveToAttackPath(List<TileData> fullPath, int moveRange, int attackRange)
+        {
+            if (fullPath == null || fullPath.Count == 0)
+            {
+                HidePath();
+                return;
+            }
+
+            HidePath();
+
+            currentPath = new List<TileData>(fullPath);
+            currentPathType = PathType.Attack; // This is an attack sequence
+            showPath = true;
+
+            // Segment 1: Movement segment (green) - tiles player can reach with movement
+            var movementSegment = PathfindingService.GetInRangePath(fullPath, moveRange);
+
+            // Segment 2: Attack segment (red) - tiles from end of movement to attack position
+            var totalReachableRange = moveRange + attackRange;
+            var reachableSegment = PathfindingService.GetInRangePath(fullPath, totalReachableRange);
+            var attackSegment = new List<TileData>();
+
+            // Attack segment = reachable tiles minus movement tiles
+            for (int i = movementSegment.Count; i < reachableSegment.Count; i++)
+            {
+                if (i < fullPath.Count)
+                {
+                    attackSegment.Add(fullPath[i]);
+                }
+            }
+
+            // Segment 3: Out of range (gray) - remaining tiles
+            var outOfRangeSegment = PathfindingService.GetOutOfRangePath(fullPath, totalReachableRange);
+
+            // Show segments with different materials
+            ShowPathSegmentWithMaterial(movementSegment, movePathMaterial);
+            ShowPathSegmentWithMaterial(attackSegment, attackPathMaterial);
+            ShowPathSegmentWithMaterial(outOfRangeSegment, outOfRangeMaterial);
+
+            Debug.Log($"PathVisualizer: Showing move-to-attack path - Movement: {movementSegment.Count}, " +
+                     $"Attack: {attackSegment.Count}, Out of range: {outOfRangeSegment.Count}");
+        }
+
         private void ShowPathSegment(List<TileData> pathSegment, bool inRange)
         {
             if (pathSegment == null || pathSegment.Count == 0)
@@ -127,13 +190,21 @@ namespace PathfindingDemo
             if (materialToUse == null)
                 return;
 
+            ShowPathSegmentWithMaterial(pathSegment, materialToUse);
+        }
+
+        private void ShowPathSegmentWithMaterial(List<TileData> pathSegment, Material material)
+        {
+            if (pathSegment == null || pathSegment.Count == 0 || material == null)
+                return;
+
             foreach (var tile in pathSegment)
             {
                 GameObject pathTile = GetPooledTile();
 
                 Vector3 position = GetTileWorldPosition(tile);
                 pathTile.transform.position = position;
-                pathTile.GetComponent<MeshRenderer>().material = materialToUse;
+                pathTile.GetComponent<MeshRenderer>().material = material;
                 pathTile.SetActive(true);
                 activeTiles.Add(pathTile);
             }

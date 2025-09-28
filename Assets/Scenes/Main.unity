@@ -389,6 +389,7 @@ GameObject:
   m_Component:
   - component: {fileID: 150197463}
   - component: {fileID: 150197464}
+  - component: {fileID: 150197465}
   m_Layer: 0
   m_Name: PlayerController
   m_TagString: Untagged
@@ -405,7 +406,7 @@ Transform:
   m_GameObject: {fileID: 150197461}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 4.6085505, y: -0.86012256, z: 0.65095174}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -427,6 +428,18 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 64
   paintDelay: 0.5
+--- !u!114 &150197465
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 150197461}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 48698035ce2844d49949b8df351d7a28, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
   playerUnitPrefab: {fileID: 5984890143167397184, guid: 8b01b9f96f137b644a8e6acde651369c, type: 3}
   enemyUnitPrefab: {fileID: 1414726890229345432, guid: 8172b74c25f61014b923135253553d3e, type: 3}
 --- !u!1 &199653817
@@ -1588,7 +1601,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 533f8bdc73fe7804cb1c3075d463d71f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  inRangeMaterial: {fileID: 2100000, guid: e65f8f36300839844aa0a6c9c4aa01df, type: 2}
+  movePathMaterial: {fileID: 2100000, guid: e65f8f36300839844aa0a6c9c4aa01df, type: 2}
   outOfRangeMaterial: {fileID: 2100000, guid: 6d2fc150855a214488320baab08e78df, type: 2}
   attackPathMaterial: {fileID: 2100000, guid: 4605428e556cc07408cbefbda05078f7, type: 2}
   pathHeight: 0.5

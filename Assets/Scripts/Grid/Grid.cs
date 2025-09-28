@@ -174,5 +174,27 @@ namespace PathfindingDemo
             return (position.x == 0 || position.x == Width - 1) &&
                    (position.y == 0 || position.y == Height - 1);
         }
+
+        public TileData GetRandomTraversableTile()
+        {
+            var availableTiles = new List<TileData>();
+
+            for (int x = 0; x < Width; x++)
+            {
+                for (int y = 0; y < Height; y++)
+                {
+                    var tile = GetTile(x, y);
+                    if (tile != null && tile.CanBeOccupied())
+                    {
+                        availableTiles.Add(tile);
+                    }
+                }
+            }
+
+            if (availableTiles.Count == 0)
+                return null;
+
+            return availableTiles[Random.Range(0, availableTiles.Count)];
+        }
     }
 }

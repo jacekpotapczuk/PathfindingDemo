@@ -1,23 +1,26 @@
 using UnityEngine;
+using System.Collections;
 using System.Collections.Generic;
+using System;
 
 namespace PathfindingDemo
 {
+    [RequireComponent(typeof(UnitManager))]
     public class PlayerController : MonoBehaviour
     {
         [Header("Input Settings")]
         [SerializeField] private LayerMask tileLayerMask = -1;
         [SerializeField] private float paintDelay = 0.2f;
 
-        [Header("Unit Prefabs")]
-        [SerializeField] private GameObject playerUnitPrefab;
-        [SerializeField] private GameObject enemyUnitPrefab;
+        // Path visualization events
+        public static event Action<List<TileData>, PathType, int> OnPathCalculated;
+        public static event Action<List<TileData>, int, int> OnMoveToAttackPathCalculated;
+        public static event Action OnPathHidden;
 
         private Camera playerCamera;
         private TileComponent hoveredTileComponent;
         private GridGenerator gridGenerator;
-        private PathVisualizer pathVisualizer;
-        private UnitComponent playerUnit;
+        private UnitManager unitManager;
         private CameraController cameraController;
 
         private bool isPainting;
@@ -47,12 +50,15 @@ namespace PathfindingDemo
 
             gridGenerator = FindFirstObjectByType<GridGenerator>();
 
-            // Create or find path visualizer
-            pathVisualizer = FindFirstObjectByType<PathVisualizer>();
+            // Initialize unit manager
+            unitManager = GetComponent<UnitManager>();
+            unitManager.Initialize(gridGenerator);
+
+            // Ensure path visualizer exists
+            var pathVisualizer = FindFirstObjectByType<PathVisualizer>();
             if (pathVisualizer == null)
             {
-                var visualizerObject = new GameObject("PathVisualizer");
-                pathVisualizer = visualizerObject.AddComponent<PathVisualizer>();
+                Debug.LogError("PlayerController: PathVisualizer not found in scene. Please add PathVisualizer component to a GameObject.");
             }
 
             Cursor.visible = true;
@@ -146,6 +152,9 @@ namespace PathfindingDemo
             hoveredTileComponent.CycleTileType();
             lastPaintedTile = hoveredTileComponent;
             lastPaintTime = Time.time;
+
+            // Update path visualization if we have an active path
+            RefreshCurrentPath();
         }
 
         private void StopPainting()
@@ -156,76 +165,9 @@ namespace PathfindingDemo
 
         private void SpawnUnits()
         {
-            if (gridGenerator?.Grid == null)
-            {
-                Debug.LogError("PlayerController: Grid not available for unit spawning");
-                return;
-            }
-
-            SpawnUnit(playerUnitPrefab, UnitType.Player);
-            SpawnUnit(enemyUnitPrefab, UnitType.Enemy);
+            unitManager.SpawnUnits();
         }
 
-        private void SpawnUnit(GameObject unitPrefab, UnitType unitType)
-        {
-            if (unitPrefab == null)
-            {
-                Debug.LogWarning($"PlayerController: No prefab assigned for {unitType} unit");
-                return;
-            }
-
-            var randomTile = GetRandomTraversableTile();
-            if (randomTile == null)
-            {
-                Debug.LogError($"PlayerController: No available tiles for {unitType} unit");
-                return;
-            }
-
-            var unitObject = Instantiate(unitPrefab);
-            var unitComponent = unitObject.GetComponent<UnitComponent>();
-
-            if (unitComponent == null)
-            {
-                Debug.LogError($"PlayerController: Unit prefab {unitPrefab.name} must have UnitComponent attached");
-                return;
-            }
-
-            // // Set unit type through reflection or make the field public
-            // var unitTypeField = typeof(UnitComponent).GetField("unitType",
-            //     System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            // unitTypeField?.SetValue(unitComponent, unitType);
-
-            unitComponent.SetTile(randomTile);
-
-            // Store reference to player unit
-            if (unitType == UnitType.Player)
-            {
-                playerUnit = unitComponent;
-            }
-        }
-
-        private TileData GetRandomTraversableTile()
-        {
-            var grid = gridGenerator.Grid;
-            var availableTiles = new System.Collections.Generic.List<TileData>();
-
-            for (int x = 0; x < grid.Width; x++)
-            {
-                for (int y = 0; y < grid.Height; y++)
-                {
-                    var tile = grid.GetTile(x, y);
-                    if (tile != null && tile.CanBeOccupied())
-                    {
-                        availableTiles.Add(tile);
-                    }
-                }
-            }
-
-            if (availableTiles.Count == 0)
-                return null;
-
-            return availableTiles[Random.Range(0, availableTiles.Count)];
-        }
 
         private void HandleRightClick(TileData targetTile)
         {
@@ -244,24 +186,25 @@ namespace PathfindingDemo
 
         private void ShowPathToTile(TileData targetTile)
         {
+            var playerUnit = unitManager.PlayerUnit;
             if (playerUnit == null || playerUnit.CurrentTile == null)
             {
                 Debug.LogWarning("PlayerController: No player unit found for pathfinding");
-                pathVisualizer?.HidePath();
+                OnPathHidden?.Invoke();
                 return;
             }
 
             // Block path drawing while unit is moving
             if (playerUnit.IsMoving)
             {
-                pathVisualizer?.HidePath();
+                OnPathHidden?.Invoke();
                 lastShownPath = null;
                 return;
             }
 
             if (targetTile == null)
             {
-                pathVisualizer?.HidePath();
+                OnPathHidden?.Invoke();
                 lastShownPath = null;
                 return;
             }
@@ -287,7 +230,7 @@ namespace PathfindingDemo
             if (path.Count == 0)
             {
                 Debug.Log($"No path found from {startTile.Position} to {targetTile.Position}");
-                pathVisualizer?.HidePath();
+                OnPathHidden?.Invoke();
                 lastShownPath = null;
                 return;
             }
@@ -295,8 +238,28 @@ namespace PathfindingDemo
             // Store the path for potential movement
             lastShownPath = new List<TileData>(path);
 
-            // Show path with range validation
-            pathVisualizer?.ShowPath(path, maxRange, pathType);
+            // Show path with appropriate visualization using events
+            if (pathType == PathType.Attack)
+            {
+                // Check if this is a move-to-attack scenario (enemy out of direct attack range)
+                bool directAttackInRange = PathfindingService.IsPathInRange(path, playerUnit.AttackRange);
+
+                if (!directAttackInRange)
+                {
+                    // Show move-to-attack path with 3 segments
+                    OnMoveToAttackPathCalculated?.Invoke(path, playerUnit.MoveRange, playerUnit.AttackRange);
+                }
+                else
+                {
+                    // Standard attack path visualization
+                    OnPathCalculated?.Invoke(path, pathType, maxRange);
+                }
+            }
+            else
+            {
+                // Standard movement path visualization
+                OnPathCalculated?.Invoke(path, pathType, maxRange);
+            }
 
             // Log path information
             bool inRange = PathfindingService.IsPathInRange(path, maxRange);
@@ -306,6 +269,7 @@ namespace PathfindingDemo
 
         private void TryMovePlayerToTile(TileData targetTile)
         {
+            var playerUnit = unitManager.PlayerUnit;
             if (playerUnit == null || lastShownPath == null || lastShownPath.Count == 0)
             {
                 Debug.LogWarning("PlayerController: Cannot move - no valid path available");
@@ -318,21 +282,15 @@ namespace PathfindingDemo
                 return;
             }
 
-            // Check if this is a movement path (not attack)
-            var pathType = PathType.Movement;
-            int maxRange = playerUnit.MoveRange;
-
-            if (targetTile.IsOccupied() && targetTile.OccupiedBy is UnitComponent targetUnit)
+            // Check if this is an attack action
+            if (targetTile.IsOccupied() && targetTile.OccupiedBy is UnitComponent targetUnit && targetUnit.Type == UnitType.Enemy)
             {
-                if (targetUnit.Type == UnitType.Enemy)
-                {
-                    Debug.Log("PlayerController: Cannot move to attack target - use attack action instead");
-                    return;
-                }
+                TryAttackEnemy(targetTile, targetUnit);
+                return;
             }
 
-            // Get only the in-range portion of the path (allows partial movement)
-            var movementPath = PathfindingService.GetInRangePath(lastShownPath, maxRange);
+            // Regular movement logic
+            var movementPath = PathfindingService.GetInRangePath(lastShownPath, playerUnit.MoveRange);
 
             // Check if we have any valid movement
             if (movementPath.Count < 2)
@@ -353,11 +311,108 @@ namespace PathfindingDemo
                 lastClickedTile = null;
 
                 // Hide the path visualization during movement
-                pathVisualizer?.HidePath();
+                OnPathHidden?.Invoke();
             }
             else
             {
                 Debug.LogWarning("PlayerController: Failed to start movement");
+            }
+        }
+
+        private void TryAttackEnemy(TileData targetTile, UnitComponent enemyUnit)
+        {
+            var playerUnit = unitManager.PlayerUnit;
+
+            // Check if we can attack directly from current position
+            bool canAttackDirectly = PathfindingService.IsPathInRange(lastShownPath, playerUnit.AttackRange);
+
+            if (canAttackDirectly)
+            {
+                // Direct attack - enemy is in range
+                Debug.Log($"PlayerController: Attacking enemy at {targetTile.Position}");
+                unitManager.KillEnemy(enemyUnit);
+
+                // Clear the stored path since attack is complete
+                lastShownPath = null;
+                lastClickedTile = null;
+                OnPathHidden?.Invoke();
+            }
+            else
+            {
+                // Check if this is a move-to-attack scenario (we have a movement path that can get us in attack range)
+                var movementPath = PathfindingService.GetInRangePath(lastShownPath, playerUnit.MoveRange);
+
+                if (movementPath.Count >= 2)
+                {
+                    // We can move - check if after movement we can attack
+                    var endPosition = movementPath[movementPath.Count - 1];
+                    int distanceToEnemyAfterMove = Mathf.Abs(endPosition.Position.x - targetTile.Position.x) +
+                                                  Mathf.Abs(endPosition.Position.y - targetTile.Position.y);
+
+                    if (distanceToEnemyAfterMove <= playerUnit.AttackRange)
+                    {
+                        // Move then attack
+                        Debug.Log($"PlayerController: Moving to position for attack");
+
+                        if (playerUnit.StartMovement(movementPath))
+                        {
+                            StartCoroutine(WaitForMovementThenAttack(enemyUnit));
+
+                            // Clear UI state
+                            lastShownPath = null;
+                            lastClickedTile = null;
+                            OnPathHidden?.Invoke();
+                        }
+                        else
+                        {
+                            Debug.LogWarning("PlayerController: Failed to start movement");
+                        }
+                    }
+                    else
+                    {
+                        // Just move closer
+                        Debug.Log($"PlayerController: Moving closer to enemy");
+
+                        if (playerUnit.StartMovement(movementPath))
+                        {
+                            // Clear UI state
+                            lastShownPath = null;
+                            lastClickedTile = null;
+                            OnPathHidden?.Invoke();
+                        }
+                    }
+                }
+                else
+                {
+                    Debug.Log("PlayerController: Cannot move or attack - no valid path");
+                }
+            }
+        }
+
+
+        private System.Collections.IEnumerator WaitForMovementThenAttack(UnitComponent enemyUnit)
+        {
+            var playerUnit = unitManager.PlayerUnit;
+            // Wait for movement to complete
+            while (playerUnit.IsMoving)
+            {
+                yield return null;
+            }
+
+            // Check if enemy still exists and attack
+            if (enemyUnit != null)
+            {
+                Debug.Log($"PlayerController: Movement complete, attacking enemy");
+                unitManager.KillEnemy(enemyUnit);
+            }
+        }
+
+        private void RefreshCurrentPath()
+        {
+            // Only refresh if we have an active target tile to show path to
+            if (lastClickedTile != null)
+            {
+                ShowPathToTile(lastClickedTile);
             }
         }
     }
