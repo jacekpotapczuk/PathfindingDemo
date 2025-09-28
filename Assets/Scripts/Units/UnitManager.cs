@@ -1,13 +1,16 @@
 using System.Collections.Generic;
 using UnityEngine;
+using System;
 
 namespace PathfindingDemo
 {
     public class UnitManager : MonoBehaviour
     {
+        // Events
+        public static event Action<UnitComponent> OnPlayerUnitSpawned;
         [Header("Unit Prefabs")]
-        [SerializeField] private GameObject playerUnitPrefab;
-        [SerializeField] private GameObject enemyUnitPrefab;
+        [SerializeField] private UnitComponent playerUnitPrefab;
+        [SerializeField] private UnitComponent enemyUnitPrefab;
 
         private GridGenerator gridGenerator;
         private UnitComponent playerUnit;
@@ -21,7 +24,7 @@ namespace PathfindingDemo
             gridGenerator = grid;
         }
 
-        public void SpawnUnits()
+        public void SpawnInitialUnits()
         {
             if (gridGenerator?.Grid == null)
             {
@@ -32,18 +35,25 @@ namespace PathfindingDemo
             // Spawn exactly one player unit
             if (playerUnit == null)
             {
-                SpawnUnit(playerUnitPrefab, UnitType.Player);
+                SpawnUnit(UnitType.Player);
             }
 
             // Spawn exactly one enemy unit
             if (activeEnemies.Count == 0)
             {
-                SpawnUnit(enemyUnitPrefab, UnitType.Enemy);
+                SpawnUnit(UnitType.Enemy);
             }
         }
 
-        public void SpawnUnit(GameObject unitPrefab, UnitType unitType)
+        public void SpawnUnit(UnitType unitType)
         {
+            var unitPrefab = unitType switch
+            {
+                UnitType.Enemy => enemyUnitPrefab,
+                UnitType.Player => playerUnitPrefab,
+                _ => throw new Exception("Invalid UnitType.")
+            };
+            
             if (unitPrefab == null)
             {
                 Debug.LogWarning($"UnitManager: No prefab assigned for {unitType} unit");
@@ -71,6 +81,7 @@ namespace PathfindingDemo
             if (unitType == UnitType.Player)
             {
                 playerUnit = unitComponent;
+                OnPlayerUnitSpawned?.Invoke(playerUnit);
             }
             else if (unitType == UnitType.Enemy)
             {

@@ -7,14 +7,12 @@ namespace PathfindingDemo
     {
         [Header("Path Visualization Settings")]
         [SerializeField] private Material movePathMaterial;
-        [SerializeField] private Material outOfRangeMaterial;
+        [SerializeField] private Material movePathMaterial2;
         [SerializeField] private Material attackPathMaterial;
         [SerializeField] private float pathHeight = 0.1f;
         [SerializeField] private int poolSize = 50;
 
         private List<TileData> currentPath = new List<TileData>();
-        private List<TileData> inRangePath = new List<TileData>();
-        private List<TileData> outOfRangePath = new List<TileData>();
         private PathType currentPathType = PathType.Movement;
         private bool showPath = false;
 
@@ -36,6 +34,7 @@ namespace PathfindingDemo
         {
             PlayerController.OnPathCalculated += ShowPath;
             PlayerController.OnMoveToAttackPathCalculated += ShowMoveToAttackPath;
+            PlayerController.OnMultiTurnPathCalculated += ShowMultiTurnPath;
             PlayerController.OnPathHidden += HidePath;
         }
 
@@ -43,6 +42,7 @@ namespace PathfindingDemo
         {
             PlayerController.OnPathCalculated -= ShowPath;
             PlayerController.OnMoveToAttackPathCalculated -= ShowMoveToAttackPath;
+            PlayerController.OnMultiTurnPathCalculated -= ShowMultiTurnPath;
             PlayerController.OnPathHidden -= HidePath;
         }
 
@@ -128,14 +128,10 @@ namespace PathfindingDemo
             currentPathType = pathType;
             showPath = true;
 
-            inRangePath = PathfindingService.GetInRangePath(path, maxRange);
-            outOfRangePath = PathfindingService.GetOutOfRangePath(path, maxRange);
-
+            var inRangePath = PathfindingService.GetInRangePath(path, maxRange);
             ShowPathSegment(inRangePath, true);
-            ShowPathSegment(outOfRangePath, false);
 
-            Debug.Log($"PathVisualizer: Showing {pathType} path with {path.Count} tiles " +
-                     $"(In range: {inRangePath.Count}, Out of range: {outOfRangePath.Count})");
+            Debug.Log($"PathVisualizer: Showing {pathType} path with {inRangePath.Count} tiles in range");
         }
 
         public void ShowMoveToAttackPath(List<TileData> fullPath, int moveRange, int attackRange)
@@ -149,13 +145,13 @@ namespace PathfindingDemo
             HidePath();
 
             currentPath = new List<TileData>(fullPath);
-            currentPathType = PathType.Attack; // This is an attack sequence
+            currentPathType = PathType.Attack;
             showPath = true;
 
-            // Segment 1: Movement segment (green) - tiles player can reach with movement
+            // Segment 1: Movement segment - tiles player can reach with movement
             var movementSegment = PathfindingService.GetInRangePath(fullPath, moveRange);
 
-            // Segment 2: Attack segment (red) - tiles from end of movement to attack position
+            // Segment 2: Attack segment - tiles from end of movement to attack position
             var totalReachableRange = moveRange + attackRange;
             var reachableSegment = PathfindingService.GetInRangePath(fullPath, totalReachableRange);
             var attackSegment = new List<TileData>();
@@ -169,17 +165,53 @@ namespace PathfindingDemo
                 }
             }
 
-            // Segment 3: Out of range (gray) - remaining tiles
-            var outOfRangeSegment = PathfindingService.GetOutOfRangePath(fullPath, totalReachableRange);
-
             // Show segments with different materials
             ShowPathSegmentWithMaterial(movementSegment, movePathMaterial);
             ShowPathSegmentWithMaterial(attackSegment, attackPathMaterial);
-            ShowPathSegmentWithMaterial(outOfRangeSegment, outOfRangeMaterial);
 
-            Debug.Log($"PathVisualizer: Showing move-to-attack path - Movement: {movementSegment.Count}, " +
-                     $"Attack: {attackSegment.Count}, Out of range: {outOfRangeSegment.Count}");
+            Debug.Log($"PathVisualizer: Showing move-to-attack path - Movement: {movementSegment.Count}, Attack: {attackSegment.Count}");
         }
+
+        public void ShowMultiTurnPath(List<(List<TileData> segment, int turnNumber)> turnSegments, List<TileData> attackSegment = null)
+        {
+            HidePath();
+
+            if (turnSegments == null || turnSegments.Count == 0)
+            {
+                return;
+            }
+
+            showPath = true;
+
+            // Show each turn segment with appropriate material
+            foreach (var (segment, turnNumber) in turnSegments)
+            {
+                Material material = GetMaterialForTurn(turnNumber);
+                if (material != null)
+                {
+                    // Show the pure movement segment (no overlaps to handle)
+                    ShowPathSegmentWithMaterial(segment, material);
+                }
+            }
+
+            // Show attack segment if provided
+            if (attackSegment != null && attackSegment.Count > 0)
+            {
+                ShowPathSegmentWithMaterial(attackSegment, attackPathMaterial);
+            }
+
+            Debug.Log($"PathVisualizer: Showing multi-turn path with {turnSegments.Count} turns" +
+                     (attackSegment != null ? $" + attack segment ({attackSegment.Count} tiles)" : ""));
+        }
+
+        private Material GetMaterialForTurn(int turnNumber)
+        {
+            // Alternate between the two materials based on turn number
+            // Odd turns (1, 3, 5...) use movePathMaterial
+            // Even turns (2, 4, 6...) use movePathMaterial2
+            return turnNumber % 2 == 1 ? movePathMaterial : movePathMaterial2;
+        }
+
 
         private void ShowPathSegment(List<TileData> pathSegment, bool inRange)
         {
@@ -214,11 +246,11 @@ namespace PathfindingDemo
         {
             if (currentPathType == PathType.Attack)
             {
-                return inRange ? attackPathMaterial : outOfRangeMaterial;
+                return attackPathMaterial;
             }
             else // Movement path
             {
-                return inRange ? movePathMaterial : outOfRangeMaterial;
+                return movePathMaterial;
             }
         }
 
@@ -226,8 +258,6 @@ namespace PathfindingDemo
         {
             showPath = false;
             currentPath.Clear();
-            inRangePath.Clear();
-            outOfRangePath.Clear();
 
             foreach (GameObject tile in activeTiles)
             {
@@ -262,8 +292,7 @@ namespace PathfindingDemo
             if (!showPath)
                 return "No path shown";
 
-            return $"{currentPathType} Path: {currentPath.Count} tiles " +
-                   $"(In range: {inRangePath.Count}, Out of range: {outOfRangePath.Count})";
+            return $"{currentPathType} Path: {currentPath.Count} tiles";
         }
 
         public string GetPoolInfo()

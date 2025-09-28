@@ -15,6 +15,7 @@ namespace PathfindingDemo
         // Path visualization events
         public static event Action<List<TileData>, PathType, int> OnPathCalculated;
         public static event Action<List<TileData>, int, int> OnMoveToAttackPathCalculated;
+        public static event Action<List<(List<TileData>, int)>, List<TileData>> OnMultiTurnPathCalculated;
         public static event Action OnPathHidden;
 
         private Camera playerCamera;
@@ -29,6 +30,10 @@ namespace PathfindingDemo
 
         private TileData lastClickedTile;
         private List<TileData> lastShownPath;
+
+        // Parameter monitoring for automatic path refresh
+        private int lastMoveRange = -1;
+        private int lastAttackRange = -1;
 
         private void Start()
         {
@@ -72,6 +77,27 @@ namespace PathfindingDemo
         {
             UpdateHoveredTile();
             HandleInput();
+            MonitorParameterChanges();
+        }
+
+        private void MonitorParameterChanges()
+        {
+            var playerUnit = unitManager?.PlayerUnit;
+            if (playerUnit == null) return;
+
+            // Check if move range changed
+            if (lastMoveRange != playerUnit.MoveRange)
+            {
+                lastMoveRange = playerUnit.MoveRange;
+                RefreshCurrentPath();
+            }
+
+            // Check if attack range changed
+            if (lastAttackRange != playerUnit.AttackRange)
+            {
+                lastAttackRange = playerUnit.AttackRange;
+                RefreshCurrentPath();
+            }
         }
 
         private void UpdateHoveredTile()
@@ -165,7 +191,15 @@ namespace PathfindingDemo
 
         private void SpawnUnits()
         {
-            unitManager.SpawnUnits();
+            unitManager.SpawnInitialUnits();
+
+            // Initialize parameter tracking after units are spawned
+            var playerUnit = unitManager?.PlayerUnit;
+            if (playerUnit != null)
+            {
+                lastMoveRange = playerUnit.MoveRange;
+                lastAttackRange = playerUnit.AttackRange;
+            }
         }
 
 
@@ -211,60 +245,103 @@ namespace PathfindingDemo
 
             var startTile = playerUnit.CurrentTile;
 
-            // Determine path type: attack if tile has enemy, movement otherwise
-            var pathType = PathType.Movement;
-            int maxRange = playerUnit.MoveRange;
-
-            if (targetTile.IsOccupied() && targetTile.OccupiedBy is UnitComponent targetUnit)
+            // Check if target is an enemy for attack logic
+            if (targetTile.IsOccupied() && targetTile.OccupiedBy is UnitComponent targetUnit && targetUnit.Type == UnitType.Enemy)
             {
-                if (targetUnit.Type == UnitType.Enemy)
-                {
-                    pathType = PathType.Attack;
-                    maxRange = playerUnit.AttackRange;
-                }
+                ShowAttackPath(startTile, targetTile, playerUnit);
+            }
+            else
+            {
+                ShowMovementPath(startTile, targetTile, playerUnit);
+            }
+        }
+
+        private void ShowAttackPath(TileData startTile, TileData targetTile, UnitComponent playerUnit)
+        {
+            // Check if target is within direct attack range
+            var directAttackPath = PathfindingService.FindPath(gridGenerator.Grid, startTile, targetTile, PathType.Attack);
+            bool directAttackInRange = directAttackPath.Count > 0 && PathfindingService.IsPathInRange(directAttackPath, playerUnit.AttackRange);
+
+            if (directAttackInRange)
+            {
+                // Direct attack - show simple attack path
+                lastShownPath = new List<TileData>(directAttackPath);
+                OnPathCalculated?.Invoke(directAttackPath, PathType.Attack, playerUnit.AttackRange);
+                Debug.Log($"Direct attack path with {directAttackPath.Count} tiles");
+                return;
             }
 
-            // Calculate path using new pathfinding service
-            var path = PathfindingService.FindPath(gridGenerator.Grid, startTile, targetTile, pathType);
+            // Find best attack position
+            var bestAttackPosition = PathfindingService.FindBestAttackPosition(gridGenerator.Grid, startTile, targetTile, playerUnit.AttackRange);
 
-            if (path.Count == 0)
+            if (bestAttackPosition == null)
             {
-                Debug.Log($"No path found from {startTile.Position} to {targetTile.Position}");
+                Debug.Log("No valid attack position found");
                 OnPathHidden?.Invoke();
                 lastShownPath = null;
                 return;
             }
 
-            // Store the path for potential movement
-            lastShownPath = new List<TileData>(path);
+            // Calculate multi-turn movement to attack position
+            var movementTurns = PathfindingService.FindMultiTurnMovementPath(gridGenerator.Grid, startTile, bestAttackPosition, playerUnit.MoveRange);
 
-            // Show path with appropriate visualization using events
-            if (pathType == PathType.Attack)
+            if (movementTurns.Count == 0)
             {
-                // Check if this is a move-to-attack scenario (enemy out of direct attack range)
-                bool directAttackInRange = PathfindingService.IsPathInRange(path, playerUnit.AttackRange);
-
-                if (!directAttackInRange)
-                {
-                    // Show move-to-attack path with 3 segments
-                    OnMoveToAttackPathCalculated?.Invoke(path, playerUnit.MoveRange, playerUnit.AttackRange);
-                }
-                else
-                {
-                    // Standard attack path visualization
-                    OnPathCalculated?.Invoke(path, pathType, maxRange);
-                }
-            }
-            else
-            {
-                // Standard movement path visualization
-                OnPathCalculated?.Invoke(path, pathType, maxRange);
+                Debug.Log("No movement path to attack position");
+                OnPathHidden?.Invoke();
+                lastShownPath = null;
+                return;
             }
 
-            // Log path information
-            bool inRange = PathfindingService.IsPathInRange(path, maxRange);
-            Debug.Log($"Path found: {pathType} path with {path.Count} tiles " +
-                     $"(Range: {maxRange}, In range: {inRange})");
+            // Calculate attack segment from final position
+            var finalPosition = movementTurns[movementTurns.Count - 1].segment[movementTurns[movementTurns.Count - 1].segment.Count - 1];
+            var attackSegment = PathfindingService.FindPath(gridGenerator.Grid, finalPosition, targetTile, PathType.Attack);
+
+            // Build combined path from pure movement segments
+            var combinedPath = new List<TileData>();
+            foreach (var (segment, _) in movementTurns)
+            {
+                combinedPath.AddRange(segment);
+            }
+
+            // Build execution path by adding current tile at the start for movement validation
+            var executionPath = new List<TileData> { startTile };
+            executionPath.AddRange(combinedPath);
+            lastShownPath = executionPath;
+
+            // Show multi-turn visualization
+            OnMultiTurnPathCalculated?.Invoke(movementTurns, attackSegment);
+            Debug.Log($"Multi-turn attack path: {movementTurns.Count} turns, attack segment: {attackSegment.Count} tiles");
+        }
+
+        private void ShowMovementPath(TileData startTile, TileData targetTile, UnitComponent playerUnit)
+        {
+            // Calculate multi-turn movement path
+            var movementTurns = PathfindingService.FindMultiTurnMovementPath(gridGenerator.Grid, startTile, targetTile, playerUnit.MoveRange);
+
+            if (movementTurns.Count == 0)
+            {
+                Debug.Log($"No movement path found from {startTile.Position} to {targetTile.Position}");
+                OnPathHidden?.Invoke();
+                lastShownPath = null;
+                return;
+            }
+
+            // Build combined path from pure movement segments
+            var combinedPath = new List<TileData>();
+            foreach (var (segment, _) in movementTurns)
+            {
+                combinedPath.AddRange(segment);
+            }
+
+            // Build execution path by adding current tile at the start for movement validation
+            var executionPath = new List<TileData> { startTile };
+            executionPath.AddRange(combinedPath);
+            lastShownPath = executionPath;
+
+            // Show multi-turn visualization
+            OnMultiTurnPathCalculated?.Invoke(movementTurns, null);
+            Debug.Log($"Multi-turn movement path: {movementTurns.Count} turns");
         }
 
         private void TryMovePlayerToTile(TileData targetTile)
@@ -322,14 +399,16 @@ namespace PathfindingDemo
         private void TryAttackEnemy(TileData targetTile, UnitComponent enemyUnit)
         {
             var playerUnit = unitManager.PlayerUnit;
+            var currentPosition = playerUnit.CurrentTile;
 
-            // Check if we can attack directly from current position
-            bool canAttackDirectly = PathfindingService.IsPathInRange(lastShownPath, playerUnit.AttackRange);
+            // Check if we can attack directly from current position using proper attack pathfinding
+            var directAttackPath = PathfindingService.FindPath(gridGenerator.Grid, currentPosition, targetTile, PathType.Attack);
+            bool canAttackDirectly = directAttackPath.Count > 0 && PathfindingService.IsPathInRange(directAttackPath, playerUnit.AttackRange);
 
             if (canAttackDirectly)
             {
-                // Direct attack - enemy is in range
-                Debug.Log($"PlayerController: Attacking enemy at {targetTile.Position}");
+                // Scenario 1: Direct attack - enemy is in range from current position
+                Debug.Log($"PlayerController: Direct attack on enemy at {targetTile.Position}");
                 unitManager.KillEnemy(enemyUnit);
 
                 // Clear the stored path since attack is complete
@@ -339,24 +418,24 @@ namespace PathfindingDemo
             }
             else
             {
-                // Check if this is a move-to-attack scenario (we have a movement path that can get us in attack range)
+                // Check if this is a move-to-attack scenario
                 var movementPath = PathfindingService.GetInRangePath(lastShownPath, playerUnit.MoveRange);
 
                 if (movementPath.Count >= 2)
                 {
-                    // We can move - check if after movement we can attack
+                    // We can move - check if after movement we can attack using proper pathfinding
                     var endPosition = movementPath[movementPath.Count - 1];
-                    int distanceToEnemyAfterMove = Mathf.Abs(endPosition.Position.x - targetTile.Position.x) +
-                                                  Mathf.Abs(endPosition.Position.y - targetTile.Position.y);
+                    var attackPathAfterMove = PathfindingService.FindPath(gridGenerator.Grid, endPosition, targetTile, PathType.Attack);
+                    bool canAttackAfterMove = attackPathAfterMove.Count > 0 && PathfindingService.IsPathInRange(attackPathAfterMove, playerUnit.AttackRange);
 
-                    if (distanceToEnemyAfterMove <= playerUnit.AttackRange)
+                    if (canAttackAfterMove)
                     {
-                        // Move then attack
+                        // Scenario 2: Move then attack (single turn)
                         Debug.Log($"PlayerController: Moving to position for attack");
 
                         if (playerUnit.StartMovement(movementPath))
                         {
-                            StartCoroutine(WaitForMovementThenAttack(enemyUnit));
+                            StartCoroutine(WaitForMovementThenAttack(enemyUnit, targetTile));
 
                             // Clear UI state
                             lastShownPath = null;
@@ -370,8 +449,8 @@ namespace PathfindingDemo
                     }
                     else
                     {
-                        // Just move closer
-                        Debug.Log($"PlayerController: Moving closer to enemy");
+                        // Scenario 3: Move closer only (multi-turn required)
+                        Debug.Log($"PlayerController: Moving closer to enemy (multi-turn required)");
 
                         if (playerUnit.StartMovement(movementPath))
                         {
@@ -390,7 +469,7 @@ namespace PathfindingDemo
         }
 
 
-        private System.Collections.IEnumerator WaitForMovementThenAttack(UnitComponent enemyUnit)
+        private System.Collections.IEnumerator WaitForMovementThenAttack(UnitComponent enemyUnit, TileData targetTile)
         {
             var playerUnit = unitManager.PlayerUnit;
             // Wait for movement to complete
@@ -399,11 +478,26 @@ namespace PathfindingDemo
                 yield return null;
             }
 
-            // Check if enemy still exists and attack
-            if (enemyUnit != null)
+            // Check if enemy still exists and validate attack range using proper pathfinding
+            if (enemyUnit != null && targetTile != null)
             {
-                Debug.Log($"PlayerController: Movement complete, attacking enemy");
-                unitManager.KillEnemy(enemyUnit);
+                var currentPosition = playerUnit.CurrentTile;
+                var attackPath = PathfindingService.FindPath(gridGenerator.Grid, currentPosition, targetTile, PathType.Attack);
+                bool canAttack = attackPath.Count > 0 && PathfindingService.IsPathInRange(attackPath, playerUnit.AttackRange);
+
+                if (canAttack)
+                {
+                    Debug.Log($"PlayerController: Movement complete, attacking enemy at {targetTile.Position}");
+                    unitManager.KillEnemy(enemyUnit);
+                }
+                else
+                {
+                    Debug.Log($"PlayerController: Movement complete, but enemy is no longer in attack range");
+                }
+            }
+            else
+            {
+                Debug.Log($"PlayerController: Movement complete, but enemy no longer exists");
             }
         }
 
