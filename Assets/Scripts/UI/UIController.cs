@@ -39,10 +39,13 @@ namespace PathfindingDemo
                 return;
             }
 
+            // Ensure sliders are properly initialized first
+            moveRangeSlider.Initialize();
+            attackRangeSlider.Initialize();
+
             moveRangeSlider.OnValueChanged += OnMoveRangeChanged;
             attackRangeSlider.OnValueChanged += OnAttackRangeChanged;
             slidersReady = true;
-            TrySetInitialValues();
         }
 
         private void SubscribeToEvents()
@@ -60,10 +63,10 @@ namespace PathfindingDemo
         private void OnPlayerUnitSpawned(UnitComponent playerUnit)
         {
             cachedPlayerUnit = playerUnit;
-            TrySetInitialValues();
+            SetSliderValues();
         }
 
-        private void TrySetInitialValues()
+        private void SetSliderValues()
         {
             if (slidersReady && cachedPlayerUnit != null)
             {

@@ -36,7 +36,6 @@ namespace PathfindingDemo
         private void SubscribeToEvents()
         {
             PlayerController.OnPathCalculated += ShowPath;
-            PlayerController.OnMoveToAttackPathCalculated += ShowMoveToAttackPath;
             PlayerController.OnMultiTurnPathCalculated += ShowMultiTurnPath;
             PlayerController.OnPathHidden += HidePath;
         }
@@ -44,7 +43,6 @@ namespace PathfindingDemo
         private void UnsubscribeFromEvents()
         {
             PlayerController.OnPathCalculated -= ShowPath;
-            PlayerController.OnMoveToAttackPathCalculated -= ShowMoveToAttackPath;
             PlayerController.OnMultiTurnPathCalculated -= ShowMultiTurnPath;
             PlayerController.OnPathHidden -= HidePath;
         }
@@ -100,7 +98,7 @@ namespace PathfindingDemo
             return CreatePathTile(pathTilePool.Count);
         }
 
-        public void ShowPath(List<TileData> path, PathType pathType, int maxRange)
+        private void ShowPath(List<TileData> path, PathType pathType, int maxRange)
         {
             if (path == null || path.Count == 0)
             {
@@ -113,39 +111,21 @@ namespace PathfindingDemo
             currentPathType = pathType;
             showPath = true;
 
-            var inRangePath = PathfindingService.GetInRangePath(path, maxRange);
-            ShowPathSegment(inRangePath, true);
-        }
+            var inRangePath = PathfindingService.GetInRangePath(path, maxRange, pathType);
 
-        public void ShowMoveToAttackPath(List<TileData> fullPath, int moveRange, int attackRange)
-        {
-            if (fullPath == null || fullPath.Count == 0)
+            // For attack paths, exclude the player's starting tile from visualization
+            if (pathType == PathType.Attack && inRangePath.Count > 1)
             {
-                HidePath();
-                return;
+                var visualPath = inRangePath.GetRange(1, inRangePath.Count - 1);
+                ShowPathSegment(visualPath);
             }
-
-            HidePath();
-            currentPath = new List<TileData>(fullPath);
-            currentPathType = PathType.Attack;
-            showPath = true;
-
-            var movementSegment = PathfindingService.GetInRangePath(fullPath, moveRange);
-            var totalReachableRange = moveRange + attackRange;
-            var reachableSegment = PathfindingService.GetInRangePath(fullPath, totalReachableRange);
-            var attackSegment = new List<TileData>();
-
-            for (var i = movementSegment.Count; i < reachableSegment.Count; i++)
+            else
             {
-                if (i < fullPath.Count)
-                    attackSegment.Add(fullPath[i]);
+                ShowPathSegment(inRangePath);
             }
-
-            ShowPathSegmentWithMaterial(movementSegment, movePathMaterial);
-            ShowPathSegmentWithMaterial(attackSegment, attackPathMaterial);
         }
-
-        public void ShowMultiTurnPath(List<(List<TileData> segment, int turnNumber)> turnSegments, List<TileData> attackSegment = null)
+        
+        private void ShowMultiTurnPath(List<(List<TileData> segment, int turnNumber)> turnSegments, List<TileData> attackSegment = null)
         {
             HidePath();
 
@@ -165,7 +145,11 @@ namespace PathfindingDemo
             }
 
             if (attackSegment != null && attackSegment.Count > 0)
-                ShowPathSegmentWithMaterial(attackSegment, attackPathMaterial);
+            {
+                // For attack segments, exclude the starting tile from visualization
+                var visualAttackSegment = attackSegment.Count > 1 ? attackSegment.GetRange(1, attackSegment.Count - 1) : attackSegment;
+                ShowPathSegmentWithMaterial(visualAttackSegment, attackPathMaterial);
+            }
         }
 
         private Material GetMaterialForTurn(int turnNumber)
@@ -174,12 +158,12 @@ namespace PathfindingDemo
         }
 
 
-        private void ShowPathSegment(List<TileData> pathSegment, bool inRange)
+        private void ShowPathSegment(List<TileData> pathSegment)
         {
             if (pathSegment == null || pathSegment.Count == 0)
                 return;
 
-            Material materialToUse = GetMaterialForPath(inRange);
+            Material materialToUse = GetMaterialForPath();
             if (materialToUse == null)
                 return;
 
@@ -202,12 +186,12 @@ namespace PathfindingDemo
             }
         }
 
-        private Material GetMaterialForPath(bool inRange)
+        private Material GetMaterialForPath()
         {
             return currentPathType == PathType.Attack ? attackPathMaterial : movePathMaterial;
         }
 
-        public void HidePath()
+        private void HidePath()
         {
             showPath = false;
             currentPath.Clear();
@@ -220,11 +204,6 @@ namespace PathfindingDemo
             activeTiles.Clear();
         }
 
-        public bool IsShowingPath()
-        {
-            return showPath && currentPath.Count > 0;
-        }
-
         private Vector3 GetTileWorldPosition(TileData tile)
         {
             if (tile?.TileObject != null)
@@ -234,24 +213,6 @@ namespace PathfindingDemo
                 return position;
             }
             return Vector3.zero;
-        }
-
-
-        public string GetPathInfo()
-        {
-            if (!showPath)
-                return "No path shown";
-
-            return $"{currentPathType} Path: {currentPath.Count} tiles";
-        }
-
-        public string GetPoolInfo()
-        {
-            var activeTileCount = activeTiles.Count;
-            var totalPoolSize = pathTilePool.Count;
-            var availableTiles = totalPoolSize - activeTileCount;
-
-            return $"Pool: {activeTileCount}/{totalPoolSize} tiles active, {availableTiles} available";
         }
     }
 }

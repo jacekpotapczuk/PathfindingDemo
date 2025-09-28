@@ -1,6 +1,7 @@
 using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
+using System;
 
 namespace PathfindingDemo
 {
@@ -32,6 +33,9 @@ namespace PathfindingDemo
         private int _animIDMotionSpeed;
 
         public bool IsMoving => isMoving;
+
+        // Movement completion event
+        public event Action OnMovementCompleted;
 
         private void Start()
         {
@@ -95,6 +99,9 @@ namespace PathfindingDemo
             isMoving = false;
             SetAnimationSpeed(0f);
             movementCoroutine = null;
+
+            // Notify subscribers that movement has completed
+            OnMovementCompleted?.Invoke();
         }
 
         private IEnumerator MoveToTile(TileData targetTile)
@@ -124,7 +131,6 @@ namespace PathfindingDemo
 
         private IEnumerator RotateToDirection()
         {
-            SetAnimationSpeed(0f);
             while (true)
             {
                 var currentRotation = transform.eulerAngles.y;
@@ -182,7 +188,7 @@ namespace PathfindingDemo
             {
                 if (footstepAudioClips.Length > 0)
                 {
-                    var index = Random.Range(0, footstepAudioClips.Length);
+                    var index = UnityEngine.Random.Range(0, footstepAudioClips.Length);
                     AudioSource.PlayClipAtPoint(footstepAudioClips[index], transform.TransformPoint(transform.position), footstepAudioVolume);
                 }
             }

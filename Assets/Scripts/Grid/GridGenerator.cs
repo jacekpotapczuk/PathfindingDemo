@@ -1,4 +1,5 @@
 using UnityEngine;
+using System;
 
 namespace PathfindingDemo
 {
@@ -25,6 +26,9 @@ namespace PathfindingDemo
 
         public Grid Grid => grid;
 
+        // Grid ready event
+        public static event Action OnGridReady;
+
         private void Awake()
         {
             CreateTilesParent();
@@ -40,13 +44,6 @@ namespace PathfindingDemo
             GenerateGrid();
         }
 
-        private void CreateTilesParent()
-        {
-            var tilesParentObject = new GameObject("Tiles");
-            tilesParentObject.transform.SetParent(transform);
-            tilesParent = tilesParentObject.transform;
-        }
-
         public void GenerateGrid()
         {
             if (tilePrefab == null)
@@ -59,6 +56,34 @@ namespace PathfindingDemo
             grid = new Grid(gridWidth, gridHeight, tileSize);
             SpawnTileObjects();
             ApplyMaterials();
+
+            // Notify that grid is ready
+            OnGridReady?.Invoke();
+        }
+        
+        public void SetTileType(int x, int y, TileType type)
+        {
+            if (grid == null) return;
+            grid.SetTileType(x, y, type);
+            var tile = grid.GetTile(x, y);
+            ApplyMaterialToTile(tile);
+        }
+
+        public void SetTileType(Vector2Int position, TileType type)
+        {
+            SetTileType(position.x, position.y, type);
+        }
+
+        public void ResizeGrid(int newWidth, int newHeight)
+        {
+            gridWidth = newWidth;
+            gridHeight = newHeight;
+            GenerateGrid();
+        }
+
+        public TileData GetTileAtWorldPosition(Vector3 worldPosition)
+        {
+            return grid?.GetTileAtWorldPosition(worldPosition);
         }
 
         private void ClearExistingTiles()
@@ -127,32 +152,14 @@ namespace PathfindingDemo
             if (materialToApply != null)
                 renderer.material = materialToApply;
         }
-
-        public void SetTileType(int x, int y, TileType type)
+        
+        private void CreateTilesParent()
         {
-            if (grid == null) return;
-            grid.SetTileType(x, y, type);
-            var tile = grid.GetTile(x, y);
-            ApplyMaterialToTile(tile);
+            var tilesParentObject = new GameObject("Tiles");
+            tilesParentObject.transform.SetParent(transform);
+            tilesParent = tilesParentObject.transform;
         }
-
-        public void SetTileType(Vector2Int position, TileType type)
-        {
-            SetTileType(position.x, position.y, type);
-        }
-
-        public void ResizeGrid(int newWidth, int newHeight)
-        {
-            gridWidth = newWidth;
-            gridHeight = newHeight;
-            GenerateGrid();
-        }
-
-        public TileData GetTileAtWorldPosition(Vector3 worldPosition)
-        {
-            return grid?.GetTileAtWorldPosition(worldPosition);
-        }
-
+        
         private void OnValidate()
         {
             gridWidth = Mathf.Max(1, gridWidth);

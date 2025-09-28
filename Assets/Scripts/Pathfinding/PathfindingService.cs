@@ -13,7 +13,7 @@ namespace PathfindingDemo
         {
             if (grid == null || start == null || target == null)
             {
-                UnityEngine.Debug.LogError("PathfindingService: Invalid parameters provided");
+                Debug.LogError("PathfindingService: Invalid parameters provided");
                 return new List<TileData>();
             }
 
@@ -40,40 +40,24 @@ namespace PathfindingDemo
             return tilePath;
         }
 
-        private static void ResetTilePathfindingData(TileData tile)
-        {
-            tile.Parent = null;
-            tile.GScore = 0;
-            tile.HScore = 0;
-        }
-
-        private static void SetWalkabilityContext(Grid grid, PathType pathType)
-        {
-            for (var x = 0; x < grid.Width; x++)
-            {
-                for (var y = 0; y < grid.Height; y++)
-                {
-                    var tile = grid.GetTile(x, y);
-                    if (tile != null)
-                        tile.CurrentPathType = pathType;
-                }
-            }
-        }
-
-        public static bool IsPathInRange(List<TileData> path, int maxRange)
+        public static bool IsPathInRange(List<TileData> path, int maxRange, PathType pathType = PathType.Movement)
         {
             if (path == null || path.Count == 0)
                 return false;
 
-            // Path length includes start tile, so actual moves = path.Count - 1
+            // For both movement and attack paths, exclude only the starting tile from distance calculation
+            // Path length includes start tile, so actual distance = path.Count - 1
             return (path.Count - 1) <= maxRange;
         }
 
-        public static List<TileData> GetInRangePath(List<TileData> path, int maxRange)
+        public static List<TileData> GetInRangePath(List<TileData> path, int maxRange, PathType pathType = PathType.Movement)
         {
             if (path == null || path.Count == 0)
                 return new List<TileData>();
 
+            // For both movement and attack paths, the calculation is the same:
+            // We want to return up to maxRange + 1 tiles (including the start tile)
+            // The difference is in how we validate the range (IsPathInRange) and visualize (PathVisualizer)
             var maxTiles = maxRange + 1;
             if (path.Count <= maxTiles)
                 return new List<TileData>(path);
@@ -91,83 +75,6 @@ namespace PathfindingDemo
                 return new List<TileData>();
 
             return path.GetRange(maxTiles - 1, path.Count - maxTiles + 1);
-        }
-
-        /// <summary>
-        /// Gets a movement segment that excludes the starting tile and returns exactly maxRange movement tiles.
-        /// Used for proper multi-turn visualization where each turn should show the actual movement tiles.
-        /// </summary>
-        public static List<TileData> GetMovementSegment(List<TileData> path, int maxRange, bool includeStartTile = false)
-        {
-            if (path == null || path.Count == 0)
-                return new List<TileData>();
-
-            var startIndex = includeStartTile ? 0 : 1;
-            var maxTiles = includeStartTile ? maxRange + 1 : maxRange;
-
-            if (path.Count <= startIndex)
-                return new List<TileData>();
-
-            var endIndex = UnityEngine.Mathf.Min(startIndex + maxTiles, path.Count);
-            var segmentLength = endIndex - startIndex;
-
-            if (segmentLength <= 0)
-                return new List<TileData>();
-
-            return path.GetRange(startIndex, segmentLength);
-        }
-
-        /// <summary>
-        /// Finds optimal path for move-to-attack scenarios by calculating in two stages:
-        /// 1. All reachable positions within movement range (movement rules only)
-        /// 2. Attack paths from each reachable position to target (attack rules)
-        /// Returns the optimal combined path.
-        /// </summary>
-        public static List<TileData> FindMoveToAttackPath(Grid grid, TileData start, TileData target, int moveRange, int attackRange)
-        {
-            if (grid == null || start == null || target == null)
-            {
-                UnityEngine.Debug.LogError("PathfindingService: Invalid parameters provided for move-to-attack pathfinding");
-                return new List<TileData>();
-            }
-
-            if (start == target)
-            {
-                return new List<TileData> { start };
-            }
-
-            var reachablePositions = FindReachablePositions(grid, start, moveRange);
-            if (reachablePositions.Count == 0)
-                return new List<TileData>();
-
-            List<TileData> bestPath = null;
-            var shortestDistance = int.MaxValue;
-
-            foreach (var reachablePos in reachablePositions)
-            {
-                var attackPath = FindPath(grid, reachablePos, target, PathType.Attack);
-                if (attackPath.Count > 0 && IsPathInRange(attackPath, attackRange))
-                {
-                    var movementPath = FindPath(grid, start, reachablePos, PathType.Movement);
-                    if (movementPath.Count > 0)
-                    {
-                        var combinedPath = new List<TileData>(movementPath);
-                        for (var i = 1; i < attackPath.Count; i++)
-                            combinedPath.Add(attackPath[i]);
-
-                        if (combinedPath.Count < shortestDistance)
-                        {
-                            shortestDistance = combinedPath.Count;
-                            bestPath = combinedPath;
-                        }
-                    }
-                }
-            }
-
-            if (bestPath == null)
-                return new List<TileData>();
-
-            return bestPath;
         }
 
         /// <summary>
@@ -199,7 +106,7 @@ namespace PathfindingDemo
                             if (tile != null && tile.CanBeOccupied())
                             {
                                 var attackPath = FindPath(grid, tile, target, PathType.Attack);
-                                if (attackPath.Count > 0 && IsPathInRange(attackPath, attackRange))
+                                if (attackPath.Count > 0 && IsPathInRange(attackPath, attackRange, PathType.Attack))
                                     attackPositions.Add(tile);
                             }
                         }
@@ -269,37 +176,46 @@ namespace PathfindingDemo
 
             return result;
         }
-
-        private static List<TileData> FindReachablePositions(Grid grid, TileData start, int maxRange)
+        
+        /// <summary>
+        /// Gets a movement segment that excludes the starting tile and returns exactly maxRange movement tiles.
+        /// Used for proper multi-turn visualization where each turn should show the actual movement tiles.
+        /// </summary>
+        private static List<TileData> GetMovementSegment(List<TileData> path, int maxRange, bool includeStartTile = false)
         {
-            var reachablePositions = new List<TileData>();
-            var visited = new HashSet<TileData>();
-            var queue = new Queue<(TileData tile, int distance)>();
+            if (path == null || path.Count == 0)
+                return new List<TileData>();
 
-            SetWalkabilityContext(grid, PathType.Movement);
-            queue.Enqueue((start, 0));
-            visited.Add(start);
+            var startIndex = includeStartTile ? 0 : 1;
+            var maxTiles = includeStartTile ? maxRange + 1 : maxRange;
 
-            while (queue.Count > 0)
+            if (path.Count <= startIndex)
+                return new List<TileData>();
+
+            var endIndex = UnityEngine.Mathf.Min(startIndex + maxTiles, path.Count);
+            var segmentLength = endIndex - startIndex;
+
+            return segmentLength <= 0 ? new List<TileData>() : path.GetRange(startIndex, segmentLength);
+        }
+        
+        private static void ResetTilePathfindingData(TileData tile)
+        {
+            tile.Parent = null;
+            tile.GScore = 0;
+            tile.HScore = 0;
+        }
+
+        private static void SetWalkabilityContext(Grid grid, PathType pathType)
+        {
+            for (var x = 0; x < grid.Width; x++)
             {
-                var (currentTile, distance) = queue.Dequeue();
-                if (distance <= maxRange)
-                    reachablePositions.Add(currentTile);
-
-                if (distance < maxRange)
+                for (var y = 0; y < grid.Height; y++)
                 {
-                    foreach (var neighbor in currentTile.GetNeighbors())
-                    {
-                        if (!visited.Contains(neighbor) && neighbor.IsWalkableForPathType(PathType.Movement) && !neighbor.IsOccupied())
-                        {
-                            visited.Add(neighbor);
-                            queue.Enqueue((neighbor, distance + 1));
-                        }
-                    }
+                    var tile = grid.GetTile(x, y);
+                    if (tile != null)
+                        tile.CurrentPathType = pathType;
                 }
             }
-
-            return reachablePositions;
         }
     }
 }

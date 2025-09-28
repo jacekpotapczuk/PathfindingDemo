@@ -11,10 +11,10 @@ namespace PathfindingDemo
         private GridData gridData;
         private readonly Vector2Int[] orthogonalDirections = new Vector2Int[]
         {
-            Vector2Int.up,      // North
-            Vector2Int.down,    // South
-            Vector2Int.left,    // West
-            Vector2Int.right    // East
+            Vector2Int.up,
+            Vector2Int.down,
+            Vector2Int.left,
+            Vector2Int.right
         };
 
         public GridData Data => gridData;
@@ -32,33 +32,6 @@ namespace PathfindingDemo
         {
             gridData = data;
             GenerateNeighborConnections();
-        }
-
-        private void GenerateNeighborConnections()
-        {
-            for (var x = 0; x < Width; x++)
-            {
-                for (var y = 0; y < Height; y++)
-                {
-                    var currentTile = gridData.GetTile(x, y);
-                    if (currentTile != null)
-                    {
-                        currentTile.ClearNeighbors();
-                        ConnectToNeighbors(currentTile);
-                    }
-                }
-            }
-        }
-
-        private void ConnectToNeighbors(TileData tile)
-        {
-            foreach (var direction in orthogonalDirections)
-            {
-                var neighborPos = tile.Position + direction;
-                var neighbor = gridData.GetTile(neighborPos);
-                if (neighbor != null)
-                    tile.AddNeighbor(neighbor);
-            }
         }
 
         public TileData GetTile(int x, int y)
@@ -95,72 +68,11 @@ namespace PathfindingDemo
         {
             return gridData.GetGridPosition(worldPosition);
         }
-
-        public List<TileData> GetTraversableNeighbors(TileData tile)
-        {
-            var traversableNeighbors = new List<TileData>();
-            foreach (var neighbor in tile.GetNeighbors())
-            {
-                if (neighbor.CanMoveThrough())
-                    traversableNeighbors.Add(neighbor);
-            }
-            return traversableNeighbors;
-        }
-
-        public List<TileData> GetAttackableNeighbors(TileData tile)
-        {
-            var attackableNeighbors = new List<TileData>();
-            foreach (var neighbor in tile.GetNeighbors())
-            {
-                if (neighbor.CanAttackThrough())
-                    attackableNeighbors.Add(neighbor);
-            }
-            return attackableNeighbors;
-        }
-
-        public void ResizeGrid(int newWidth, int newHeight)
-        {
-            gridData.ResizeGrid(newWidth, newHeight);
-            GenerateNeighborConnections();
-        }
-
+        
         public TileData GetTileAtWorldPosition(Vector3 worldPosition)
         {
             var gridPos = GetGridPosition(worldPosition);
             return GetTile(gridPos);
-        }
-
-        public List<TileData> GetAllTilesOfType(TileType type)
-        {
-            var tilesOfType = new List<TileData>();
-            for (var x = 0; x < Width; x++)
-            {
-                for (var y = 0; y < Height; y++)
-                {
-                    var tile = GetTile(x, y);
-                    if (tile != null && tile.Type == type)
-                        tilesOfType.Add(tile);
-                }
-            }
-            return tilesOfType;
-        }
-
-        public int GetNeighborCount(Vector2Int position)
-        {
-            var tile = GetTile(position);
-            return tile?.GetNeighbors().Count ?? 0;
-        }
-
-        public bool IsEdgeTile(Vector2Int position)
-        {
-            return position.x == 0 || position.x == Width - 1 ||
-                   position.y == 0 || position.y == Height - 1;
-        }
-
-        public bool IsCornerTile(Vector2Int position)
-        {
-            return (position.x == 0 || position.x == Width - 1) &&
-                   (position.y == 0 || position.y == Height - 1);
         }
 
         public TileData GetRandomTraversableTile()
@@ -180,6 +92,33 @@ namespace PathfindingDemo
                 return null;
 
             return availableTiles[Random.Range(0, availableTiles.Count)];
+        }
+        
+        private void GenerateNeighborConnections()
+        {
+            for (var x = 0; x < Width; x++)
+            {
+                for (var y = 0; y < Height; y++)
+                {
+                    var currentTile = gridData.GetTile(x, y);
+                    if (currentTile != null)
+                    {
+                        currentTile.ClearNeighbors();
+                        ConnectToNeighbors(currentTile);
+                    }
+                }
+            }
+        }
+
+        private void ConnectToNeighbors(TileData tile)
+        {
+            foreach (var direction in orthogonalDirections)
+            {
+                var neighborPos = tile.Position + direction;
+                var neighbor = gridData.GetTile(neighborPos);
+                if (neighbor != null)
+                    tile.AddNeighbor(neighbor);
+            }
         }
     }
 }

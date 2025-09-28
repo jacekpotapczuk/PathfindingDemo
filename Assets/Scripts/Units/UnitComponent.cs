@@ -1,6 +1,7 @@
 using UnityEngine;
 using System.Collections.Generic;
 using System.Collections;
+using System;
 
 namespace PathfindingDemo
 {
@@ -30,9 +31,14 @@ namespace PathfindingDemo
         public TileData CurrentTile => currentTile;
         public bool IsMoving => movementComponent.IsMoving;
 
+        // Movement completion event
+        public event Action OnMovementCompleted;
+
         private void Start()
         {
             movementComponent = GetComponent<UnitMovementComponent>();
+            // Subscribe to movement completion event
+            movementComponent.OnMovementCompleted += () => OnMovementCompleted?.Invoke();
         }
 
         public bool CanOccupyTile(TileData tile)
@@ -97,6 +103,10 @@ namespace PathfindingDemo
 
         private void OnDestroy()
         {
+            // Clean up event subscription
+            if (movementComponent != null)
+                movementComponent.OnMovementCompleted -= () => OnMovementCompleted?.Invoke();
+
             RemoveFromTile();
         }
 
@@ -120,7 +130,7 @@ namespace PathfindingDemo
                 var mainRigidbody = gameObject.GetComponent<Rigidbody>();
                 if (mainRigidbody == null)
                     mainRigidbody = gameObject.AddComponent<Rigidbody>();
-                var fallbackForce = Vector3.up * 5f + Random.insideUnitSphere * 2f;
+                var fallbackForce = Vector3.up * 5f + UnityEngine.Random.insideUnitSphere * 2f;
                 mainRigidbody.AddForce(fallbackForce, ForceMode.Impulse);
                 return;
             }
@@ -152,16 +162,16 @@ namespace PathfindingDemo
 
             if (mainTorso != null)
             {
-                var mainForce = Vector3.up * 3f + Random.insideUnitSphere * 1.5f;
+                var mainForce = Vector3.up * 3f + UnityEngine.Random.insideUnitSphere * 1.5f;
                 mainTorso.AddForce(mainForce, ForceMode.Impulse);
-                mainTorso.AddTorque(Random.insideUnitSphere * 5f, ForceMode.Impulse);
+                mainTorso.AddTorque(UnityEngine.Random.insideUnitSphere * 5f, ForceMode.Impulse);
             }
 
             foreach (var rb in rigidbodies)
             {
                 if (rb != mainTorso)
                 {
-                    var randomForce = Random.insideUnitSphere * 0.5f;
+                    var randomForce = UnityEngine.Random.insideUnitSphere * 0.5f;
                     rb.AddForce(randomForce, ForceMode.Impulse);
                 }
             }

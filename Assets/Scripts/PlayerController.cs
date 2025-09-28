@@ -17,7 +17,6 @@ namespace PathfindingDemo
 
         // Path visualization events
         public static event Action<List<TileData>, PathType, int> OnPathCalculated;
-        public static event Action<List<TileData>, int, int> OnMoveToAttackPathCalculated;
         public static event Action<List<(List<TileData>, int)>, List<TileData>> OnMultiTurnPathCalculated;
         public static event Action OnPathHidden;
 
@@ -37,6 +36,13 @@ namespace PathfindingDemo
         // Parameter monitoring for automatic path refresh
         private int lastMoveRange = -1;
         private int lastAttackRange = -1;
+
+        // Attack after movement tracking
+        private UnitComponent pendingAttackTarget;
+        private TileData pendingAttackTargetTile;
+
+        // Unit spawning state
+        private bool unitsSpawned = false;
 
         private void Start()
         {
@@ -61,7 +67,30 @@ namespace PathfindingDemo
 
             Cursor.visible = true;
             Cursor.lockState = CursorLockMode.None;
-            Invoke(nameof(SpawnUnits), 0.1f);
+
+            // Subscribe to player unit spawning event for proper initialization
+            UnitManager.OnPlayerUnitSpawned += OnPlayerUnitSpawned;
+
+            // Subscribe to grid ready event for proper initialization order
+            GridGenerator.OnGridReady += OnGridReady;
+
+            // If grid is already ready, spawn units immediately
+            if (gridGenerator.Grid != null && !unitsSpawned)
+            {
+                SpawnUnits();
+            }
+        }
+        
+        private void OnDestroy()
+        {
+            UnitManager.OnPlayerUnitSpawned -= OnPlayerUnitSpawned;
+            GridGenerator.OnGridReady -= OnGridReady;
+
+            var playerUnit = unitManager?.PlayerUnit;
+            if (playerUnit != null)
+            {
+                playerUnit.OnMovementCompleted -= OnPlayerMovementCompleted;
+            }
         }
 
         private void Update()
@@ -168,12 +197,49 @@ namespace PathfindingDemo
 
         private void SpawnUnits()
         {
+            if (unitsSpawned) return;
+
             unitManager.SpawnInitialUnits();
-            var playerUnit = unitManager?.PlayerUnit;
+            unitsSpawned = true;
+        }
+
+        private void OnGridReady()
+        {
+            if (!unitsSpawned)
+                SpawnUnits();
+        }
+
+        private void OnPlayerUnitSpawned(UnitComponent playerUnit)
+        {
             if (playerUnit != null)
             {
                 lastMoveRange = playerUnit.MoveRange;
                 lastAttackRange = playerUnit.AttackRange;
+
+                // Subscribe to movement completion for attack execution
+                playerUnit.OnMovementCompleted += OnPlayerMovementCompleted;
+            }
+        }
+
+        private void OnPlayerMovementCompleted()
+        {
+            // Check if there's a pending attack to execute
+            if (pendingAttackTarget != null && pendingAttackTargetTile != null)
+            {
+                var playerUnit = unitManager.PlayerUnit;
+                if (playerUnit != null)
+                {
+                    var currentPosition = playerUnit.CurrentTile;
+                    var attackPath = PathfindingService.FindPath(gridGenerator.Grid, currentPosition, pendingAttackTargetTile, PathType.Attack);
+                    var canAttack = attackPath.Count > 0 && PathfindingService.IsPathInRange(attackPath, playerUnit.AttackRange, PathType.Attack);
+
+                    if (canAttack)
+                        unitManager.KillEnemy(pendingAttackTarget);
+                }
+
+                // Clear pending attack
+                pendingAttackTarget = null;
+                pendingAttackTargetTile = null;
             }
         }
 
@@ -231,7 +297,7 @@ namespace PathfindingDemo
         {
             // Check if target is within direct attack range
             var directAttackPath = PathfindingService.FindPath(gridGenerator.Grid, startTile, targetTile, PathType.Attack);
-            bool directAttackInRange = directAttackPath.Count > 0 && PathfindingService.IsPathInRange(directAttackPath, playerUnit.AttackRange);
+            bool directAttackInRange = directAttackPath.Count > 0 && PathfindingService.IsPathInRange(directAttackPath, playerUnit.AttackRange, PathType.Attack);
 
             if (directAttackInRange)
             {
@@ -329,7 +395,7 @@ namespace PathfindingDemo
             }
 
             // Regular movement logic
-            var movementPath = PathfindingService.GetInRangePath(lastShownPath, playerUnit.MoveRange);
+            var movementPath = PathfindingService.GetInRangePath(lastShownPath, playerUnit.MoveRange, PathType.Movement);
 
             if (movementPath.Count < 2)
                 return;
@@ -348,7 +414,7 @@ namespace PathfindingDemo
             var currentPosition = playerUnit.CurrentTile;
 
             var directAttackPath = PathfindingService.FindPath(gridGenerator.Grid, currentPosition, targetTile, PathType.Attack);
-            var canAttackDirectly = directAttackPath.Count > 0 && PathfindingService.IsPathInRange(directAttackPath, playerUnit.AttackRange);
+            var canAttackDirectly = directAttackPath.Count > 0 && PathfindingService.IsPathInRange(directAttackPath, playerUnit.AttackRange, PathType.Attack);
 
             if (canAttackDirectly)
             {
@@ -359,18 +425,21 @@ namespace PathfindingDemo
             }
             else
             {
-                var movementPath = PathfindingService.GetInRangePath(lastShownPath, playerUnit.MoveRange);
+                var movementPath = PathfindingService.GetInRangePath(lastShownPath, playerUnit.MoveRange, PathType.Movement);
                 if (movementPath.Count >= 2)
                 {
-                    var endPosition = movementPath[movementPath.Count - 1];
+                    var endPosition = movementPath[^1];
                     var attackPathAfterMove = PathfindingService.FindPath(gridGenerator.Grid, endPosition, targetTile, PathType.Attack);
-                    var canAttackAfterMove = attackPathAfterMove.Count > 0 && PathfindingService.IsPathInRange(attackPathAfterMove, playerUnit.AttackRange);
+                    var canAttackAfterMove = attackPathAfterMove.Count > 0 && PathfindingService.IsPathInRange(attackPathAfterMove, playerUnit.AttackRange, PathType.Attack);
 
                     if (canAttackAfterMove)
                     {
                         if (playerUnit.StartMovement(movementPath))
                         {
-                            StartCoroutine(WaitForMovementThenAttack(enemyUnit, targetTile));
+                            // Set up pending attack for when movement completes
+                            pendingAttackTarget = enemyUnit;
+                            pendingAttackTargetTile = targetTile;
+
                             lastShownPath = null;
                             lastClickedTile = null;
                             OnPathHidden?.Invoke();
@@ -386,24 +455,6 @@ namespace PathfindingDemo
                         }
                     }
                 }
-            }
-        }
-
-
-        private System.Collections.IEnumerator WaitForMovementThenAttack(UnitComponent enemyUnit, TileData targetTile)
-        {
-            var playerUnit = unitManager.PlayerUnit;
-            while (playerUnit.IsMoving)
-                yield return null;
-
-            if (enemyUnit != null && targetTile != null)
-            {
-                var currentPosition = playerUnit.CurrentTile;
-                var attackPath = PathfindingService.FindPath(gridGenerator.Grid, currentPosition, targetTile, PathType.Attack);
-                var canAttack = attackPath.Count > 0 && PathfindingService.IsPathInRange(attackPath, playerUnit.AttackRange);
-
-                if (canAttack)
-                    unitManager.KillEnemy(enemyUnit);
             }
         }
 
