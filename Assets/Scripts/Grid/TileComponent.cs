@@ -2,6 +2,9 @@ using UnityEngine;
 
 namespace PathfindingDemo
 {
+    /// <summary>
+    /// MonoBehaviour component that handles tile UI interactions and type cycling.
+    /// </summary>
     public class TileComponent : MonoBehaviour
     {
         private TileData tileData;
@@ -18,7 +21,7 @@ namespace PathfindingDemo
             var gridGenerator = FindFirstObjectByType<GridGenerator>();
             if (gridGenerator == null) return;
 
-            TileType nextType = tileData.Type switch
+            var nextType = tileData.Type switch
             {
                 TileType.Traversable => TileType.Obstacle,
                 TileType.Obstacle => TileType.Cover,

@@ -4,6 +4,9 @@ using System.Collections.Generic;
 
 namespace PathfindingDemo
 {
+    /// <summary>
+    /// Handles unit movement animation and pathfinding along tile-based paths.
+    /// </summary>
     [RequireComponent(typeof(UnitComponent))]
     public class UnitMovementComponent : MonoBehaviour
     {
@@ -20,12 +23,8 @@ namespace PathfindingDemo
         private Animator animator;
         private bool isMoving = false;
         private Coroutine movementCoroutine;
-
-        // Rotation tracking variables
         private float _targetRotation = 0.0f;
         private float _rotationVelocity;
-
-        // Animation IDs
         private int _animIDSpeed;
         private int _animIDGrounded;
         private int _animIDJump;
@@ -38,12 +37,8 @@ namespace PathfindingDemo
         {
             unitComponent = GetComponent<UnitComponent>();
             animator = GetComponent<Animator>();
-
             if (animator == null)
-            {
                 Debug.LogWarning($"UnitMovementComponent: No Animator component found on {gameObject.name}");
-            }
-
             AssignAnimationIDs();
         }
 
@@ -80,7 +75,6 @@ namespace PathfindingDemo
                 StopCoroutine(movementCoroutine);
                 movementCoroutine = null;
             }
-
             isMoving = false;
             SetAnimationSpeed(0f);
         }
@@ -90,27 +84,17 @@ namespace PathfindingDemo
             isMoving = true;
             SetAnimationSpeed(moveSpeed);
 
-            // Skip the first tile since we're already on it
-            for (int i = 1; i < path.Count; i++)
+            for (var i = 1; i < path.Count; i++)
             {
                 var targetTile = path[i];
-
-                // Validate the target tile is still walkable and unoccupied
                 if (!targetTile.CanBeOccupied())
-                {
-                    Debug.LogWarning($"UnitMovementComponent: Movement stopped - tile {targetTile.Position} is no longer available");
                     break;
-                }
-
                 yield return StartCoroutine(MoveToTile(targetTile));
             }
 
-            // Movement complete
             isMoving = false;
             SetAnimationSpeed(0f);
             movementCoroutine = null;
-
-            Debug.Log($"UnitMovementComponent: Movement completed. Now at {unitComponent.CurrentTile?.Position}");
         }
 
         private IEnumerator MoveToTile(TileData targetTile)
@@ -121,77 +105,57 @@ namespace PathfindingDemo
                 yield break;
             }
 
-            Vector3 startPosition = transform.position;
-            Vector3 targetPosition = targetTile.TileObject.transform.position;
-            targetPosition.y += 0.5f; // Unit height above tile
+            var startPosition = transform.position;
+            var targetPosition = targetTile.TileObject.transform.position;
+            targetPosition.y += 0.5f;
 
-            // Calculate target rotation
-            Vector3 direction = (targetPosition - startPosition).normalized;
-            direction.y = 0; // Keep rotation only on horizontal plane
+            var direction = (targetPosition - startPosition).normalized;
+            direction.y = 0;
 
             if (direction.magnitude > 0.01f)
             {
                 _targetRotation = Mathf.Atan2(direction.x, direction.z) * Mathf.Rad2Deg;
-
-                // Phase 1: Rotation - Stop and rotate toward target
                 yield return StartCoroutine(RotateToDirection());
             }
 
-            // Phase 2: Movement - Move forward while maintaining rotation
             yield return StartCoroutine(MoveForward(startPosition, targetPosition));
-
-            // Update tile occupancy through the unit component
             unitComponent.SetTile(targetTile);
         }
 
         private IEnumerator RotateToDirection()
         {
-            // Stop movement animation during rotation
             SetAnimationSpeed(0f);
-
             while (true)
             {
-                float currentRotation = transform.eulerAngles.y;
-
-                // Use SmoothDampAngle for smooth rotation like ThirdPersonController
-                float rotation = Mathf.SmoothDampAngle(currentRotation, _targetRotation, ref _rotationVelocity, rotationSmoothTime);
-
+                var currentRotation = transform.eulerAngles.y;
+                var rotation = Mathf.SmoothDampAngle(currentRotation, _targetRotation, ref _rotationVelocity, rotationSmoothTime);
                 transform.rotation = Quaternion.Euler(0.0f, rotation, 0.0f);
 
-                // Check if rotation is close enough to target
-                float angleDifference = Mathf.DeltaAngle(currentRotation, _targetRotation);
+                var angleDifference = Mathf.DeltaAngle(currentRotation, _targetRotation);
                 if (Mathf.Abs(angleDifference) < rotationThreshold)
                 {
-                    // Snap to exact rotation and break
                     transform.rotation = Quaternion.Euler(0.0f, _targetRotation, 0.0f);
                     break;
                 }
-
                 yield return null;
             }
         }
 
         private IEnumerator MoveForward(Vector3 startPosition, Vector3 targetPosition)
         {
-            // Start movement animation
             SetAnimationSpeed(moveSpeed);
-
-            float distance = Vector3.Distance(startPosition, targetPosition);
-            float moveTime = distance / moveSpeed;
-            float elapsedTime = 0f;
+            var distance = Vector3.Distance(startPosition, targetPosition);
+            var moveTime = distance / moveSpeed;
+            var elapsedTime = 0f;
 
             while (elapsedTime < moveTime)
             {
-                float t = elapsedTime / moveTime;
-
-                // Only interpolate position, keep rotation fixed
+                var t = elapsedTime / moveTime;
                 transform.position = Vector3.Lerp(startPosition, targetPosition, t);
-
                 elapsedTime += Time.deltaTime;
                 yield return null;
             }
 
-            // Ensure we end up exactly at the target
             transform.position = targetPosition;
         }
 
@@ -212,7 +176,6 @@ namespace PathfindingDemo
             _animIDMotionSpeed = Animator.StringToHash("MotionSpeed");
         }
 
-        // Receive event from animation (taken from Unity's ThirdPersonController to avoid errors on footstep notifications)
         private void OnFootstep(AnimationEvent animationEvent)
         {
             if (animationEvent.animatorClipInfo.weight > 0.5f)

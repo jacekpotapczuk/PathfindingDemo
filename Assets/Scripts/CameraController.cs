@@ -2,6 +2,9 @@ using UnityEngine;
 
 namespace PathfindingDemo
 {
+    /// <summary>
+    /// Simple camera movement controller using WASD keys for grid navigation.
+    /// </summary>
     public class CameraController : MonoBehaviour
     {
         [Header("Movement Settings")]
@@ -13,9 +16,7 @@ namespace PathfindingDemo
         {
             playerCamera = GetComponent<Camera>();
             if (playerCamera == null)
-            {
                 playerCamera = Camera.main;
-            }
         }
 
         private void Update()
@@ -25,7 +26,7 @@ namespace PathfindingDemo
 
         private void HandleCameraMovement()
         {
-            Vector3 moveDirection = Vector3.zero;
+            var moveDirection = Vector3.zero;
 
             if (Input.GetKey(KeyCode.W))
                 moveDirection += Vector3.forward;
@@ -39,12 +40,9 @@ namespace PathfindingDemo
             if (moveDirection != Vector3.zero)
             {
                 moveDirection.Normalize();
-                Vector3 currentPosition = transform.position;
-                Vector3 newPosition = currentPosition + moveDirection * moveSpeed * Time.deltaTime;
-
-                // Keep the Y position constant
+                var currentPosition = transform.position;
+                var newPosition = currentPosition + moveDirection * moveSpeed * Time.deltaTime;
                 newPosition.y = currentPosition.y;
-
                 transform.position = newPosition;
             }
         }

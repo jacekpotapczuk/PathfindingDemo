@@ -5,6 +5,9 @@ using System;
 
 namespace PathfindingDemo
 {
+    /// <summary>
+    /// Controls UI slider with text display and value change events.
+    /// </summary>
     public class SliderController : MonoBehaviour
     {
         [Header("UI Elements")]
@@ -62,14 +65,12 @@ namespace PathfindingDemo
         public void Cleanup()
         {
             if (slider != null)
-            {
                 slider.onValueChanged.RemoveListener(OnSliderValueChanged);
-            }
         }
 
         private void OnSliderValueChanged(float value)
         {
-            int intValue = Mathf.RoundToInt(value);
+            var intValue = Mathf.RoundToInt(value);
             UpdateText(intValue);
             OnValueChanged?.Invoke(intValue);
         }
@@ -77,9 +78,7 @@ namespace PathfindingDemo
         private void UpdateText(int value)
         {
             if (valueText != null)
-            {
                 valueText.text = value.ToString();
-            }
         }
     }
 }

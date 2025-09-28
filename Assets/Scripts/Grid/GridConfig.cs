@@ -2,6 +2,9 @@ using UnityEngine;
 
 namespace PathfindingDemo
 {
+    /// <summary>
+    /// ScriptableObject configuration for grid generation settings and materials.
+    /// </summary>
     [CreateAssetMenu(fileName = "GridConfig", menuName = "Pathfinding Demo/Grid Config")]
     public class GridConfig : ScriptableObject
     {
@@ -50,8 +53,7 @@ namespace PathfindingDemo
             if (!useRandomGeneration)
                 return TileType.Traversable;
 
-            float random = Random.value;
-
+            var random = Random.value;
             if (random < obstacleChance)
                 return TileType.Obstacle;
             else if (random < obstacleChance + coverChance)
@@ -63,9 +65,6 @@ namespace PathfindingDemo
         public void ApplyToGenerator(GridGenerator generator)
         {
             if (generator == null) return;
-
-            // Note: This would require adding setters to GridGenerator
-            // or making the fields public for this to work
             Debug.Log($"Applying GridConfig: {defaultWidth}x{defaultHeight}");
         }
     }

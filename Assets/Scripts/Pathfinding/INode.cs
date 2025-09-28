@@ -1,22 +1,19 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 
 namespace PathfindingDemo
 {
+    /// <summary>
+    /// Interface for pathfinding nodes with A* algorithm support.
+    /// </summary>
     public interface INode
     {
-        public int X { get; }
-        public int Y { get; }
-    
-        public List<INode> GetNeighbours();
-    
-        public INode Parent { get; set; }
-    
-        public int GScore { get; set; }
-    
-        public int HScore { get; set; }
-    
-        public int FScore { get; }
-
-        public bool IsWalkable { get; }
+        int X { get; }
+        int Y { get; }
+        List<INode> GetNeighbours();
+        INode Parent { get; set; }
+        int GScore { get; set; }
+        int HScore { get; set; }
+        int FScore { get; }
+        bool IsWalkable { get; }
     }
 }

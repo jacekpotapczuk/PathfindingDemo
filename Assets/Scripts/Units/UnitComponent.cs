@@ -10,6 +10,9 @@ namespace PathfindingDemo
         Enemy
     }
 
+    /// <summary>
+    /// Core unit behavior handling tile occupancy, movement, and combat interactions.
+    /// </summary>
     [RequireComponent(typeof(UnitMovementComponent))]
     public class UnitComponent : MonoBehaviour, ITileOccupant
     {
@@ -51,18 +54,14 @@ namespace PathfindingDemo
                 return;
             }
 
-            // Remove from current tile if we have one
             RemoveFromTile();
-
-            // Set new tile
             currentTile = tile;
             tile.SetOccupant(this);
 
-            // Position the unit GameObject on the tile
             if (tile.TileObject != null)
             {
-                Vector3 tilePosition = tile.TileObject.transform.position;
-                tilePosition.y += 0.5f; // Place unit above the tile
+                var tilePosition = tile.TileObject.transform.position;
+                tilePosition.y += 0.5f;
                 transform.position = tilePosition;
             }
         }
@@ -113,19 +112,14 @@ namespace PathfindingDemo
         {
             var animator = GetComponent<Animator>();
             if (animator != null)
-            {
                 animator.enabled = false;
-            }
 
             var rigidbodies = GetComponentsInChildren<Rigidbody>();
-
             if (rigidbodies.Length == 0)
             {
                 var mainRigidbody = gameObject.GetComponent<Rigidbody>();
                 if (mainRigidbody == null)
-                {
                     mainRigidbody = gameObject.AddComponent<Rigidbody>();
-                }
                 var fallbackForce = Vector3.up * 5f + Random.insideUnitSphere * 2f;
                 mainRigidbody.AddForce(fallbackForce, ForceMode.Impulse);
                 return;
@@ -138,16 +132,14 @@ namespace PathfindingDemo
             }
 
             ApplyDeathForces(rigidbodies);
-            Debug.Log($"Ragdoll activated with {rigidbodies.Length} rigidbodies");
         }
 
         private void ApplyDeathForces(Rigidbody[] rigidbodies)
         {
             Rigidbody mainTorso = null;
-
             foreach (var rb in rigidbodies)
             {
-                string boneName = rb.name.ToLower();
+                var boneName = rb.name.ToLower();
                 if (boneName.Contains("spine") || boneName.Contains("chest") || boneName.Contains("hips"))
                 {
                     mainTorso = rb;
@@ -156,13 +148,11 @@ namespace PathfindingDemo
             }
 
             if (mainTorso == null && rigidbodies.Length > 0)
-            {
                 mainTorso = rigidbodies[0];
-            }
 
             if (mainTorso != null)
             {
-                Vector3 mainForce = Vector3.up * 3f + Random.insideUnitSphere * 1.5f;
+                var mainForce = Vector3.up * 3f + Random.insideUnitSphere * 1.5f;
                 mainTorso.AddForce(mainForce, ForceMode.Impulse);
                 mainTorso.AddTorque(Random.insideUnitSphere * 5f, ForceMode.Impulse);
             }
@@ -171,7 +161,7 @@ namespace PathfindingDemo
             {
                 if (rb != mainTorso)
                 {
-                    Vector3 randomForce = Random.insideUnitSphere * 0.5f;
+                    var randomForce = Random.insideUnitSphere * 0.5f;
                     rb.AddForce(randomForce, ForceMode.Impulse);
                 }
             }

@@ -4,10 +4,13 @@ using System;
 
 namespace PathfindingDemo
 {
+    /// <summary>
+    /// Manages unit spawning, lifecycle, and combat interactions between player and enemy units.
+    /// </summary>
     public class UnitManager : MonoBehaviour
     {
-        // Events
         public static event Action<UnitComponent> OnPlayerUnitSpawned;
+
         [Header("Unit Prefabs")]
         [SerializeField] private UnitComponent playerUnitPrefab;
         [SerializeField] private UnitComponent enemyUnitPrefab;
@@ -32,17 +35,11 @@ namespace PathfindingDemo
                 return;
             }
 
-            // Spawn exactly one player unit
             if (playerUnit == null)
-            {
                 SpawnUnit(UnitType.Player);
-            }
 
-            // Spawn exactly one enemy unit
             if (activeEnemies.Count == 0)
-            {
                 SpawnUnit(UnitType.Enemy);
-            }
         }
 
         public void SpawnUnit(UnitType unitType)
@@ -53,7 +50,7 @@ namespace PathfindingDemo
                 UnitType.Player => playerUnitPrefab,
                 _ => throw new Exception("Invalid UnitType.")
             };
-            
+
             if (unitPrefab == null)
             {
                 Debug.LogWarning($"UnitManager: No prefab assigned for {unitType} unit");
@@ -69,7 +66,6 @@ namespace PathfindingDemo
 
             var unitObject = Instantiate(unitPrefab);
             var unitComponent = unitObject.GetComponent<UnitComponent>();
-
             if (unitComponent == null)
             {
                 Debug.LogError($"UnitManager: Unit prefab {unitPrefab.name} must have UnitComponent attached");
@@ -77,7 +73,6 @@ namespace PathfindingDemo
             }
 
             unitComponent.SetTile(randomTile);
-
             if (unitType == UnitType.Player)
             {
                 playerUnit = unitComponent;
@@ -92,44 +87,31 @@ namespace PathfindingDemo
         public void SpawnNewEnemyImmediately()
         {
             if (enemyUnitPrefab == null)
-            {
-                Debug.LogWarning("UnitManager: Cannot spawn new enemy - no enemyUnitPrefab assigned");
                 return;
-            }
 
             var spawnTile = gridGenerator.Grid.GetRandomTraversableTile();
             if (spawnTile == null)
-            {
-                Debug.LogWarning("UnitManager: Cannot spawn new enemy - no available tiles");
                 return;
-            }
 
             var enemyObject = Instantiate(enemyUnitPrefab);
             var enemyComponent = enemyObject.GetComponent<UnitComponent>();
-
             if (enemyComponent == null)
             {
-                Debug.LogError($"UnitManager: Enemy prefab {enemyUnitPrefab.name} must have UnitComponent attached");
                 Destroy(enemyObject);
                 return;
             }
 
             enemyComponent.SetTile(spawnTile);
             activeEnemies.Add(enemyComponent);
-
-            Debug.Log($"UnitManager: New enemy spawned at {spawnTile.Position}");
         }
 
         public void KillEnemy(UnitComponent enemyUnit)
         {
             if (activeEnemies.Contains(enemyUnit))
-            {
                 activeEnemies.Remove(enemyUnit);
-            }
 
             enemyUnit.Kill();
             SpawnNewEnemyImmediately();
-            Debug.Log("UnitManager: Enemy killed, new enemy spawned");
         }
 
         public bool IsPlayerUnit(UnitComponent unit)

@@ -10,6 +10,9 @@ namespace PathfindingDemo
         Cover = 2
     }
 
+    /// <summary>
+    /// Represents a single tile in the grid with pathfinding and occupancy data.
+    /// </summary>
     [System.Serializable]
     public class TileData : INode
     {
@@ -35,7 +38,6 @@ namespace PathfindingDemo
         {
             Position = position;
             Type = type;
-            // Initialize pathfinding properties
             Parent = null;
             GScore = 0;
             HScore = 0;
@@ -44,9 +46,7 @@ namespace PathfindingDemo
         public void AddNeighbor(TileData neighbor)
         {
             if (neighbor != null && !neighbors.Contains(neighbor))
-            {
                 neighbors.Add(neighbor);
-            }
         }
 
         public IReadOnlyList<TileData> GetNeighbors()
@@ -54,24 +54,20 @@ namespace PathfindingDemo
             return neighbors.AsReadOnly();
         }
 
-        // INode interface method for pathfinding
         public List<INode> GetNeighbours()
         {
             var nodeNeighbors = new List<INode>();
             foreach (var neighbor in neighbors)
-            {
                 nodeNeighbors.Add(neighbor);
-            }
             return nodeNeighbors;
         }
 
-        // Pathfinding-specific neighbor filtering
         public List<INode> GetNeighbours(PathType pathType)
         {
             var validNeighbors = new List<INode>();
             foreach (var neighbor in neighbors)
             {
-                bool isWalkable = pathType switch
+                var isWalkable = pathType switch
                 {
                     PathType.Movement => neighbor.CanMoveThrough() && !neighbor.IsOccupied(),
                     PathType.Attack => neighbor.CanAttackThrough(),
@@ -79,14 +75,11 @@ namespace PathfindingDemo
                 };
 
                 if (isWalkable)
-                {
                     validNeighbors.Add(neighbor);
-                }
             }
             return validNeighbors;
         }
 
-        // Context-aware walkability for pathfinding
         public bool IsWalkable => IsWalkableForPathType(CurrentPathType);
 
         public bool IsWalkableForPathType(PathType pathType)

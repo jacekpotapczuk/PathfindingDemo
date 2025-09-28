@@ -3,6 +3,9 @@ using UnityEngine;
 
 namespace PathfindingDemo
 {
+    /// <summary>
+    /// Visualizes pathfinding results with pooled tile objects and multi-turn path display.
+    /// </summary>
     public class PathVisualizer : MonoBehaviour
     {
         [Header("Path Visualization Settings")]
@@ -48,26 +51,21 @@ namespace PathfindingDemo
 
         private void InitializePathTilePool()
         {
-            for (int i = 0; i < poolSize; i++)
-            {
+            for (var i = 0; i < poolSize; i++)
                 CreatePathTile(i);
-            }
-            Debug.Log($"PathVisualizer: Initialized pool with {poolSize} tiles");
         }
 
         private GameObject CreatePathTile(int index)
         {
-            GameObject tile = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            var tile = GameObject.CreatePrimitive(PrimitiveType.Cube);
             tile.name = $"PathTile_{index}";
             tile.transform.SetParent(transform);
             tile.transform.localScale = new Vector3(0.8f, 0.1f, 0.8f);
             tile.SetActive(false);
 
-            Collider collider = tile.GetComponent<Collider>();
+            var collider = tile.GetComponent<Collider>();
             if (collider != null)
-            {
                 Destroy(collider);
-            }
 
             pathTilePool.Add(tile);
             return tile;
@@ -75,42 +73,30 @@ namespace PathfindingDemo
 
         private void ExpandPool()
         {
-            int oldSize = pathTilePool.Count;
-            int newTilesCount = oldSize; // Double the size
+            var oldSize = pathTilePool.Count;
+            var newTilesCount = oldSize;
 
-            for (int i = 0; i < newTilesCount; i++)
-            {
+            for (var i = 0; i < newTilesCount; i++)
                 CreatePathTile(oldSize + i);
-            }
 
             poolSize = pathTilePool.Count;
-            Debug.Log($"PathVisualizer: Expanded pool from {oldSize} to {poolSize} tiles");
         }
 
         private GameObject GetPooledTile()
         {
-            foreach (GameObject tile in pathTilePool)
+            foreach (var tile in pathTilePool)
             {
                 if (!tile.activeInHierarchy)
-                {
                     return tile;
-                }
             }
 
-            // No available tiles, expand the pool
             ExpandPool();
-
-            // Return the first newly created tile
-            foreach (GameObject tile in pathTilePool)
+            foreach (var tile in pathTilePool)
             {
                 if (!tile.activeInHierarchy)
-                {
                     return tile;
-                }
             }
 
-            // Fallback: Create a single tile on demand if expansion somehow failed
-            Debug.LogWarning("PathVisualizer: Pool expansion failed, creating emergency tile");
             return CreatePathTile(pathTilePool.Count);
         }
 
@@ -123,15 +109,12 @@ namespace PathfindingDemo
             }
 
             HidePath();
-
             currentPath = new List<TileData>(path);
             currentPathType = pathType;
             showPath = true;
 
             var inRangePath = PathfindingService.GetInRangePath(path, maxRange);
             ShowPathSegment(inRangePath, true);
-
-            Debug.Log($"PathVisualizer: Showing {pathType} path with {inRangePath.Count} tiles in range");
         }
 
         public void ShowMoveToAttackPath(List<TileData> fullPath, int moveRange, int attackRange)
@@ -143,33 +126,23 @@ namespace PathfindingDemo
             }
 
             HidePath();
-
             currentPath = new List<TileData>(fullPath);
             currentPathType = PathType.Attack;
             showPath = true;
 
-            // Segment 1: Movement segment - tiles player can reach with movement
             var movementSegment = PathfindingService.GetInRangePath(fullPath, moveRange);
-
-            // Segment 2: Attack segment - tiles from end of movement to attack position
             var totalReachableRange = moveRange + attackRange;
             var reachableSegment = PathfindingService.GetInRangePath(fullPath, totalReachableRange);
             var attackSegment = new List<TileData>();
 
-            // Attack segment = reachable tiles minus movement tiles
-            for (int i = movementSegment.Count; i < reachableSegment.Count; i++)
+            for (var i = movementSegment.Count; i < reachableSegment.Count; i++)
             {
                 if (i < fullPath.Count)
-                {
                     attackSegment.Add(fullPath[i]);
-                }
             }
 
-            // Show segments with different materials
             ShowPathSegmentWithMaterial(movementSegment, movePathMaterial);
             ShowPathSegmentWithMaterial(attackSegment, attackPathMaterial);
-
-            Debug.Log($"PathVisualizer: Showing move-to-attack path - Movement: {movementSegment.Count}, Attack: {attackSegment.Count}");
         }
 
         public void ShowMultiTurnPath(List<(List<TileData> segment, int turnNumber)> turnSegments, List<TileData> attackSegment = null)
@@ -186,29 +159,17 @@ namespace PathfindingDemo
             // Show each turn segment with appropriate material
             foreach (var (segment, turnNumber) in turnSegments)
             {
-                Material material = GetMaterialForTurn(turnNumber);
+                var material = GetMaterialForTurn(turnNumber);
                 if (material != null)
-                {
-                    // Show the pure movement segment (no overlaps to handle)
                     ShowPathSegmentWithMaterial(segment, material);
-                }
             }
 
-            // Show attack segment if provided
             if (attackSegment != null && attackSegment.Count > 0)
-            {
                 ShowPathSegmentWithMaterial(attackSegment, attackPathMaterial);
-            }
-
-            Debug.Log($"PathVisualizer: Showing multi-turn path with {turnSegments.Count} turns" +
-                     (attackSegment != null ? $" + attack segment ({attackSegment.Count} tiles)" : ""));
         }
 
         private Material GetMaterialForTurn(int turnNumber)
         {
-            // Alternate between the two materials based on turn number
-            // Odd turns (1, 3, 5...) use movePathMaterial
-            // Even turns (2, 4, 6...) use movePathMaterial2
             return turnNumber % 2 == 1 ? movePathMaterial : movePathMaterial2;
         }
 
@@ -232,9 +193,8 @@ namespace PathfindingDemo
 
             foreach (var tile in pathSegment)
             {
-                GameObject pathTile = GetPooledTile();
-
-                Vector3 position = GetTileWorldPosition(tile);
+                var pathTile = GetPooledTile();
+                var position = GetTileWorldPosition(tile);
                 pathTile.transform.position = position;
                 pathTile.GetComponent<MeshRenderer>().material = material;
                 pathTile.SetActive(true);
@@ -244,14 +204,7 @@ namespace PathfindingDemo
 
         private Material GetMaterialForPath(bool inRange)
         {
-            if (currentPathType == PathType.Attack)
-            {
-                return attackPathMaterial;
-            }
-            else // Movement path
-            {
-                return movePathMaterial;
-            }
+            return currentPathType == PathType.Attack ? attackPathMaterial : movePathMaterial;
         }
 
         public void HidePath()
@@ -259,12 +212,10 @@ namespace PathfindingDemo
             showPath = false;
             currentPath.Clear();
 
-            foreach (GameObject tile in activeTiles)
+            foreach (var tile in activeTiles)
             {
                 if (tile != null)
-                {
                     tile.SetActive(false);
-                }
             }
             activeTiles.Clear();
         }
@@ -278,7 +229,7 @@ namespace PathfindingDemo
         {
             if (tile?.TileObject != null)
             {
-                Vector3 position = tile.TileObject.transform.position;
+                var position = tile.TileObject.transform.position;
                 position.y += pathHeight;
                 return position;
             }
@@ -286,7 +237,6 @@ namespace PathfindingDemo
         }
 
 
-        // Debug information
         public string GetPathInfo()
         {
             if (!showPath)
@@ -297,9 +247,9 @@ namespace PathfindingDemo
 
         public string GetPoolInfo()
         {
-            int activeTileCount = activeTiles.Count;
-            int totalPoolSize = pathTilePool.Count;
-            int availableTiles = totalPoolSize - activeTileCount;
+            var activeTileCount = activeTiles.Count;
+            var totalPoolSize = pathTilePool.Count;
+            var availableTiles = totalPoolSize - activeTileCount;
 
             return $"Pool: {activeTileCount}/{totalPoolSize} tiles active, {availableTiles} available";
         }

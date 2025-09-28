@@ -3,6 +3,9 @@ using UnityEngine;
 
 namespace PathfindingDemo
 {
+    /// <summary>
+    /// Core grid system that manages tile connections and pathfinding logic.
+    /// </summary>
     public class Grid
     {
         private GridData gridData;
@@ -33,9 +36,9 @@ namespace PathfindingDemo
 
         private void GenerateNeighborConnections()
         {
-            for (int x = 0; x < Width; x++)
+            for (var x = 0; x < Width; x++)
             {
-                for (int y = 0; y < Height; y++)
+                for (var y = 0; y < Height; y++)
                 {
                     var currentTile = gridData.GetTile(x, y);
                     if (currentTile != null)
@@ -53,11 +56,8 @@ namespace PathfindingDemo
             {
                 var neighborPos = tile.Position + direction;
                 var neighbor = gridData.GetTile(neighborPos);
-
                 if (neighbor != null)
-                {
                     tile.AddNeighbor(neighbor);
-                }
             }
         }
 
@@ -99,30 +99,22 @@ namespace PathfindingDemo
         public List<TileData> GetTraversableNeighbors(TileData tile)
         {
             var traversableNeighbors = new List<TileData>();
-
             foreach (var neighbor in tile.GetNeighbors())
             {
                 if (neighbor.CanMoveThrough())
-                {
                     traversableNeighbors.Add(neighbor);
-                }
             }
-
             return traversableNeighbors;
         }
 
         public List<TileData> GetAttackableNeighbors(TileData tile)
         {
             var attackableNeighbors = new List<TileData>();
-
             foreach (var neighbor in tile.GetNeighbors())
             {
                 if (neighbor.CanAttackThrough())
-                {
                     attackableNeighbors.Add(neighbor);
-                }
             }
-
             return attackableNeighbors;
         }
 
@@ -141,19 +133,15 @@ namespace PathfindingDemo
         public List<TileData> GetAllTilesOfType(TileType type)
         {
             var tilesOfType = new List<TileData>();
-
-            for (int x = 0; x < Width; x++)
+            for (var x = 0; x < Width; x++)
             {
-                for (int y = 0; y < Height; y++)
+                for (var y = 0; y < Height; y++)
                 {
                     var tile = GetTile(x, y);
                     if (tile != null && tile.Type == type)
-                    {
                         tilesOfType.Add(tile);
-                    }
                 }
             }
-
             return tilesOfType;
         }
 
@@ -178,16 +166,13 @@ namespace PathfindingDemo
         public TileData GetRandomTraversableTile()
         {
             var availableTiles = new List<TileData>();
-
-            for (int x = 0; x < Width; x++)
+            for (var x = 0; x < Width; x++)
             {
-                for (int y = 0; y < Height; y++)
+                for (var y = 0; y < Height; y++)
                 {
                     var tile = GetTile(x, y);
                     if (tile != null && tile.CanBeOccupied())
-                    {
                         availableTiles.Add(tile);
-                    }
                 }
             }
 

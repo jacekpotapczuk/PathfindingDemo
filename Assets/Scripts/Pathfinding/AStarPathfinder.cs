@@ -1,9 +1,11 @@
 using System.Collections.Generic;
-using PathfindingDemo;
 using UnityEngine;
 
 namespace PathfindingDemo
 {
+    /// <summary>
+    /// A* pathfinding algorithm implementation for grid-based navigation.
+    /// </summary>
     public class AStarPathfinder
     {
         private SortedSet<INode> openList;
@@ -21,12 +23,11 @@ namespace PathfindingDemo
             startNode.Parent = null;
             openList.Add(startNode);
 
-            while (DoPathfinding())
-            {
-            }
+            while (DoPathfinding()) { }
 
             if (endNode.Parent == null)
                 return null;
+
             var path = new List<INode>();
             var node = endNode;
             while (node != null)
@@ -39,7 +40,6 @@ namespace PathfindingDemo
             return path;
         }
 
-        // returns false when pathfinding is complete
         private bool DoPathfinding()
         {
             if (openList.Count == 0)
@@ -49,8 +49,7 @@ namespace PathfindingDemo
             }
 
             var currentNode = openList.Min;
-            if (currentNode ==
-                endNode) // we can exit this early, because we have uniform movement cost over the whole board
+            if (currentNode == endNode)
                 return false;
 
             openList.Remove(currentNode);
@@ -85,7 +84,6 @@ namespace PathfindingDemo
                 node.GScore = potentialParent.GScore + 1;
                 node.HScore = GetManhattanDistance(node, endNode);
                 openList.Add(node);
-
             }
         }
 

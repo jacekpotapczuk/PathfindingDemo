@@ -1,8 +1,10 @@
-﻿using System.Collections.Generic;
-using PathfindingDemo;
+using System.Collections.Generic;
 
 namespace PathfindingDemo
 {
+    /// <summary>
+    /// Comparer for A* pathfinding nodes that prioritizes by F-score, then H-score, then coordinates.
+    /// </summary>
     public class ByFScore : IComparer<INode>
     {
         public int Compare(INode node1, INode node2)
@@ -17,9 +19,6 @@ namespace PathfindingDemo
             if (node2.HScore < node1.HScore)
                 return 1;
         
-            // this order doesn't really matter,
-            // we just want to distinguish between tiles and return 0 only of coordinates are the same
-            // however this can be changed to alter search preferences
             if (node1.X < node2.X)
                 return -1;
             if (node1.X > node2.X)

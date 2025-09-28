@@ -2,6 +2,9 @@ using UnityEngine;
 
 namespace PathfindingDemo
 {
+    /// <summary>
+    /// Generates and manages the visual grid representation with tile GameObjects.
+    /// </summary>
     public class GridGenerator : MonoBehaviour
     {
         [Header("Grid Settings")]
@@ -34,7 +37,6 @@ namespace PathfindingDemo
                 Debug.LogError("GridGenerator: Tile prefab is not assigned!");
                 return;
             }
-
             GenerateGrid();
         }
 
@@ -54,46 +56,36 @@ namespace PathfindingDemo
             }
 
             ClearExistingTiles();
-
             grid = new Grid(gridWidth, gridHeight, tileSize);
-
             SpawnTileObjects();
             ApplyMaterials();
         }
 
         private void ClearExistingTiles()
         {
-            if (tilesParent != null)
+            if (tilesParent == null) return;
+
+            for (var i = tilesParent.childCount - 1; i >= 0; i--)
             {
-                for (int i = tilesParent.childCount - 1; i >= 0; i--)
-                {
-                    if (Application.isPlaying)
-                    {
-                        Destroy(tilesParent.GetChild(i).gameObject);
-                    }
-                    else
-                    {
-                        DestroyImmediate(tilesParent.GetChild(i).gameObject);
-                    }
-                }
+                if (Application.isPlaying)
+                    Destroy(tilesParent.GetChild(i).gameObject);
+                else
+                    DestroyImmediate(tilesParent.GetChild(i).gameObject);
             }
         }
 
         private void SpawnTileObjects()
         {
-            for (int x = 0; x < gridWidth; x++)
+            for (var x = 0; x < gridWidth; x++)
             {
-                for (int y = 0; y < gridHeight; y++)
+                for (var y = 0; y < gridHeight; y++)
                 {
                     var tile = grid.GetTile(x, y);
                     var worldPosition = grid.GetWorldPosition(new Vector2Int(x, y));
-
                     var tileObject = Instantiate(tilePrefab, worldPosition, Quaternion.identity, tilesParent);
                     tileObject.name = $"Tile_{x}_{y}";
-
                     tile.TileObject = tileObject;
 
-                    // Get TileComponent (should be on prefab)
                     var tileComponent = tileObject.GetComponent<TileComponent>();
                     if (tileComponent == null)
                     {
@@ -107,9 +99,9 @@ namespace PathfindingDemo
 
         private void ApplyMaterials()
         {
-            for (int x = 0; x < gridWidth; x++)
+            for (var x = 0; x < gridWidth; x++)
             {
-                for (int y = 0; y < gridHeight; y++)
+                for (var y = 0; y < gridHeight; y++)
                 {
                     var tile = grid.GetTile(x, y);
                     ApplyMaterialToTile(tile);
@@ -124,7 +116,7 @@ namespace PathfindingDemo
             var renderer = tile.TileObject.GetComponent<Renderer>();
             if (renderer == null) return;
 
-            Material materialToApply = tile.Type switch
+            var materialToApply = tile.Type switch
             {
                 TileType.Traversable => traversableMaterial,
                 TileType.Obstacle => obstacleMaterial,
@@ -133,15 +125,12 @@ namespace PathfindingDemo
             };
 
             if (materialToApply != null)
-            {
                 renderer.material = materialToApply;
-            }
         }
 
         public void SetTileType(int x, int y, TileType type)
         {
             if (grid == null) return;
-
             grid.SetTileType(x, y, type);
             var tile = grid.GetTile(x, y);
             ApplyMaterialToTile(tile);
@@ -164,7 +153,6 @@ namespace PathfindingDemo
             return grid?.GetTileAtWorldPosition(worldPosition);
         }
 
-        // Editor helpers
         private void OnValidate()
         {
             gridWidth = Mathf.Max(1, gridWidth);

@@ -3,6 +3,9 @@ using UnityEngine.UI;
 
 namespace PathfindingDemo
 {
+    /// <summary>
+    /// Main UI controller that manages range sliders and enemy spawning for the game interface.
+    /// </summary>
     public class UIController : MonoBehaviour
     {
         [Header("Slider Controllers")]
@@ -11,8 +14,6 @@ namespace PathfindingDemo
         [SerializeField] private Button spawnEnemyButton;
 
         private UnitManager unitManager;
-
-        // Initialization flags
         private bool slidersReady = false;
         private UnitComponent cachedPlayerUnit = null;
 
@@ -26,11 +27,8 @@ namespace PathfindingDemo
         private void InitializeComponents()
         {
             unitManager = FindFirstObjectByType<UnitManager>();
-
             if (unitManager == null)
-            {
                 Debug.LogError("UIController: UnitManager not found in scene");
-            }
         }
 
         private void InitializeSliders()
@@ -41,17 +39,9 @@ namespace PathfindingDemo
                 return;
             }
 
-            // SliderControllers will initialize themselves in their Start() method
-            // We just need to set up our event listeners and set initial values
-
-            // Setup event listeners
             moveRangeSlider.OnValueChanged += OnMoveRangeChanged;
             attackRangeSlider.OnValueChanged += OnAttackRangeChanged;
-
-            // Mark sliders as ready
             slidersReady = true;
-
-            // Try to set initial values if player unit is already available
             TrySetInitialValues();
         }
 
@@ -64,9 +54,7 @@ namespace PathfindingDemo
         private void OnSpawnEnemyButtonClicked()
         {
             if (unitManager)
-            {
-                unitManager.SpawnUnit(UnitType.Enemy);   
-            }
+                unitManager.SpawnUnit(UnitType.Enemy);
         }
 
         private void OnPlayerUnitSpawned(UnitComponent playerUnit)
@@ -77,7 +65,6 @@ namespace PathfindingDemo
 
         private void TrySetInitialValues()
         {
-            // Only set values when both sliders are ready AND player unit is available
             if (slidersReady && cachedPlayerUnit != null)
             {
                 moveRangeSlider.SetValue(cachedPlayerUnit.MoveRange);
@@ -103,20 +90,13 @@ namespace PathfindingDemo
 
         private void OnDestroy()
         {
-            // Clean up event listeners
             if (moveRangeSlider != null)
-            {
                 moveRangeSlider.OnValueChanged -= OnMoveRangeChanged;
-            }
 
             if (attackRangeSlider != null)
-            {
                 attackRangeSlider.OnValueChanged -= OnAttackRangeChanged;
-            }
 
-            // Unsubscribe from static events
             UnitManager.OnPlayerUnitSpawned -= OnPlayerUnitSpawned;
-            
             spawnEnemyButton.onClick.RemoveAllListeners();
         }
     }

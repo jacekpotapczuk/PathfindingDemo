@@ -2,6 +2,9 @@ using UnityEngine;
 
 namespace PathfindingDemo
 {
+    /// <summary>
+    /// Manages grid data storage and provides grid-based coordinate operations.
+    /// </summary>
     [System.Serializable]
     public class GridData
     {
@@ -20,17 +23,15 @@ namespace PathfindingDemo
             this.width = width;
             this.height = height;
             this.tileSize = tileSize;
-
             InitializeTiles();
         }
 
         private void InitializeTiles()
         {
             tiles = new TileData[width, height];
-
-            for (int x = 0; x < width; x++)
+            for (var x = 0; x < width; x++)
             {
-                for (int y = 0; y < height; y++)
+                for (var y = 0; y < height; y++)
                 {
                     tiles[x, y] = new TileData(new Vector2Int(x, y));
                 }
@@ -55,9 +56,7 @@ namespace PathfindingDemo
         {
             var tile = GetTile(x, y);
             if (tile != null)
-            {
                 tile.Type = type;
-            }
         }
 
         public void SetTileType(Vector2Int position, TileType type)
@@ -87,8 +86,8 @@ namespace PathfindingDemo
 
         public Vector2Int GetGridPosition(Vector3 worldPosition)
         {
-            int x = Mathf.RoundToInt(worldPosition.x / tileSize);
-            int z = Mathf.RoundToInt(worldPosition.z / tileSize);
+            var x = Mathf.RoundToInt(worldPosition.x / tileSize);
+            var z = Mathf.RoundToInt(worldPosition.z / tileSize);
             return new Vector2Int(x, z);
         }
 
@@ -100,23 +99,19 @@ namespace PathfindingDemo
         public void ResizeGrid(int newWidth, int newHeight)
         {
             var oldTiles = tiles;
-            int oldWidth = width;
-            int oldHeight = height;
+            var oldWidth = width;
+            var oldHeight = height;
 
             width = newWidth;
             height = newHeight;
-
             InitializeTiles();
 
-            // Copy existing tiles if they fit in the new grid
-            for (int x = 0; x < Mathf.Min(oldWidth, newWidth); x++)
+            for (var x = 0; x < Mathf.Min(oldWidth, newWidth); x++)
             {
-                for (int y = 0; y < Mathf.Min(oldHeight, newHeight); y++)
+                for (var y = 0; y < Mathf.Min(oldHeight, newHeight); y++)
                 {
                     if (oldTiles[x, y] != null)
-                    {
                         tiles[x, y].Type = oldTiles[x, y].Type;
-                    }
                 }
             }
         }
