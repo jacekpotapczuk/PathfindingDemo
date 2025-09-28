@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections.Generic;
 
 namespace PathfindingDemo
 {
@@ -6,6 +7,7 @@ namespace PathfindingDemo
     {
         [Header("Input Settings")]
         [SerializeField] private LayerMask tileLayerMask = -1;
+        [SerializeField] private float paintDelay = 0.2f;
 
         [Header("Unit Prefabs")]
         [SerializeField] private GameObject playerUnitPrefab;
@@ -16,6 +18,14 @@ namespace PathfindingDemo
         private GridGenerator gridGenerator;
         private PathVisualizer pathVisualizer;
         private UnitComponent playerUnit;
+        private CameraController cameraController;
+
+        private bool isPainting;
+        private TileComponent lastPaintedTile;
+        private float lastPaintTime;
+
+        private TileData lastClickedTile;
+        private List<TileData> lastShownPath;
 
         private void Start()
         {
@@ -23,6 +33,16 @@ namespace PathfindingDemo
             if (playerCamera == null)
             {
                 playerCamera = FindFirstObjectByType<Camera>();
+            }
+
+            // Add camera controller if not already present
+            if (playerCamera != null)
+            {
+                cameraController = playerCamera.GetComponent<CameraController>();
+                if (cameraController == null)
+                {
+                    cameraController = playerCamera.gameObject.AddComponent<CameraController>();
+                }
             }
 
             gridGenerator = FindFirstObjectByType<GridGenerator>();
@@ -74,15 +94,64 @@ namespace PathfindingDemo
 
         private void HandleInput()
         {
-            if (Input.GetMouseButtonDown(0) && hoveredTileComponent != null)
-            {
-                hoveredTileComponent.CycleTileType();
-            }
+            HandleTilePainting();
 
             if (Input.GetMouseButtonDown(1) && hoveredTileComponent != null)
             {
-                ShowPathToTile(hoveredTileComponent.TileData);
+                HandleRightClick(hoveredTileComponent.TileData);
             }
+        }
+
+        private void HandleTilePainting()
+        {
+            if (Input.GetMouseButtonDown(0))
+            {
+                StartPainting();
+            }
+            else if (Input.GetMouseButton(0) && isPainting)
+            {
+                ContinuePainting();
+            }
+            else if (Input.GetMouseButtonUp(0))
+            {
+                StopPainting();
+            }
+        }
+
+        private void StartPainting()
+        {
+            if (hoveredTileComponent == null) return;
+
+            isPainting = true;
+            PaintCurrentTile();
+        }
+
+        private void ContinuePainting()
+        {
+            if (hoveredTileComponent == null) return;
+
+            bool movedToNewTile = hoveredTileComponent != lastPaintedTile;
+            bool enoughTimeElapsed = Time.time - lastPaintTime >= paintDelay;
+
+            if (movedToNewTile || enoughTimeElapsed)
+            {
+                PaintCurrentTile();
+            }
+        }
+
+        private void PaintCurrentTile()
+        {
+            if (hoveredTileComponent == null) return;
+
+            hoveredTileComponent.CycleTileType();
+            lastPaintedTile = hoveredTileComponent;
+            lastPaintTime = Time.time;
+        }
+
+        private void StopPainting()
+        {
+            isPainting = false;
+            lastPaintedTile = null;
         }
 
         private void SpawnUnits()
@@ -117,7 +186,8 @@ namespace PathfindingDemo
 
             if (unitComponent == null)
             {
-                unitComponent = unitObject.AddComponent<UnitComponent>();
+                Debug.LogError($"PlayerController: Unit prefab {unitPrefab.name} must have UnitComponent attached");
+                return;
             }
 
             // // Set unit type through reflection or make the field public
@@ -157,6 +227,21 @@ namespace PathfindingDemo
             return availableTiles[Random.Range(0, availableTiles.Count)];
         }
 
+        private void HandleRightClick(TileData targetTile)
+        {
+            if (targetTile == lastClickedTile && lastShownPath != null && lastShownPath.Count > 0)
+            {
+                // Same tile clicked twice - attempt movement
+                TryMovePlayerToTile(targetTile);
+            }
+            else
+            {
+                // First click or different tile - show path
+                ShowPathToTile(targetTile);
+                lastClickedTile = targetTile;
+            }
+        }
+
         private void ShowPathToTile(TileData targetTile)
         {
             if (playerUnit == null || playerUnit.CurrentTile == null)
@@ -166,9 +251,18 @@ namespace PathfindingDemo
                 return;
             }
 
+            // Block path drawing while unit is moving
+            if (playerUnit.IsMoving)
+            {
+                pathVisualizer?.HidePath();
+                lastShownPath = null;
+                return;
+            }
+
             if (targetTile == null)
             {
                 pathVisualizer?.HidePath();
+                lastShownPath = null;
                 return;
             }
 
@@ -194,8 +288,12 @@ namespace PathfindingDemo
             {
                 Debug.Log($"No path found from {startTile.Position} to {targetTile.Position}");
                 pathVisualizer?.HidePath();
+                lastShownPath = null;
                 return;
             }
+
+            // Store the path for potential movement
+            lastShownPath = new List<TileData>(path);
 
             // Show path with range validation
             pathVisualizer?.ShowPath(path, maxRange, pathType);
@@ -204,6 +302,63 @@ namespace PathfindingDemo
             bool inRange = PathfindingService.IsPathInRange(path, maxRange);
             Debug.Log($"Path found: {pathType} path with {path.Count} tiles " +
                      $"(Range: {maxRange}, In range: {inRange})");
+        }
+
+        private void TryMovePlayerToTile(TileData targetTile)
+        {
+            if (playerUnit == null || lastShownPath == null || lastShownPath.Count == 0)
+            {
+                Debug.LogWarning("PlayerController: Cannot move - no valid path available");
+                return;
+            }
+
+            if (playerUnit.IsMoving)
+            {
+                Debug.Log("PlayerController: Cannot move - unit is already moving");
+                return;
+            }
+
+            // Check if this is a movement path (not attack)
+            var pathType = PathType.Movement;
+            int maxRange = playerUnit.MoveRange;
+
+            if (targetTile.IsOccupied() && targetTile.OccupiedBy is UnitComponent targetUnit)
+            {
+                if (targetUnit.Type == UnitType.Enemy)
+                {
+                    Debug.Log("PlayerController: Cannot move to attack target - use attack action instead");
+                    return;
+                }
+            }
+
+            // Get only the in-range portion of the path (allows partial movement)
+            var movementPath = PathfindingService.GetInRangePath(lastShownPath, maxRange);
+
+            // Check if we have any valid movement
+            if (movementPath.Count < 2)
+            {
+                Debug.Log("PlayerController: Cannot move - no valid movement path available");
+                return;
+            }
+
+            // Start movement
+            if (playerUnit.StartMovement(movementPath))
+            {
+                bool isPartialMovement = movementPath.Count < lastShownPath.Count;
+                string movementType = isPartialMovement ? "partial" : "full";
+                Debug.Log($"PlayerController: Starting {movementType} movement along path with {movementPath.Count} tiles");
+
+                // Clear the stored path since we're now moving
+                lastShownPath = null;
+                lastClickedTile = null;
+
+                // Hide the path visualization during movement
+                pathVisualizer?.HidePath();
+            }
+            else
+            {
+                Debug.LogWarning("PlayerController: Failed to start movement");
+            }
         }
     }
 }

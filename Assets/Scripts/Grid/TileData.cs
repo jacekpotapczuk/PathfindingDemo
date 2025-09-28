@@ -93,7 +93,7 @@ namespace PathfindingDemo
         {
             return pathType switch
             {
-                PathType.Movement => CanMoveThrough() && !IsOccupied(),
+                PathType.Movement => CanMoveThrough(),
                 PathType.Attack => CanAttackThrough(),
                 _ => false
             };

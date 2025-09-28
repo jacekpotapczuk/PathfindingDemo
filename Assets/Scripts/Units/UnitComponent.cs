@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections.Generic;
 
 namespace PathfindingDemo
 {
@@ -8,6 +9,7 @@ namespace PathfindingDemo
         Enemy
     }
 
+    [RequireComponent(typeof(UnitMovementComponent))]
     public class UnitComponent : MonoBehaviour, ITileOccupant
     {
         [Header("Unit Settings")]
@@ -16,11 +18,18 @@ namespace PathfindingDemo
         [SerializeField] private int attackRange = 4;
 
         private TileData currentTile;
+        private UnitMovementComponent movementComponent;
 
         public UnitType Type => unitType;
         public int MoveRange => moveRange;
         public int AttackRange => attackRange;
         public TileData CurrentTile => currentTile;
+        public bool IsMoving => movementComponent.IsMoving;
+
+        private void Start()
+        {
+            movementComponent = GetComponent<UnitMovementComponent>();
+        }
 
         public bool CanOccupyTile(TileData tile)
         {
@@ -76,6 +85,16 @@ namespace PathfindingDemo
             attackRange = Mathf.Max(0, range);
         }
 
+        public bool StartMovement(List<TileData> path)
+        {
+            return movementComponent.StartMovement(path);
+        }
+
+        public void StopMovement()
+        {
+            movementComponent.StopMovement();
+        }
+
         private void OnDestroy()
         {
             RemoveFromTile();
@@ -84,7 +103,8 @@ namespace PathfindingDemo
         public override string ToString()
         {
             var tileInfo = currentTile != null ? $" on {currentTile.Position}" : " (no tile)";
-            return $"{unitType} Unit{tileInfo} - Move:{moveRange}, Attack:{attackRange}";
+            var movingInfo = IsMoving ? " [Moving]" : "";
+            return $"{unitType} Unit{tileInfo} - Move:{moveRange}, Attack:{attackRange}{movingInfo}";
         }
     }
 }

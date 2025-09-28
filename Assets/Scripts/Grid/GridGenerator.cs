@@ -93,11 +93,12 @@ namespace PathfindingDemo
 
                     tile.TileObject = tileObject;
 
-                    // Add a TileComponent for easy tile reference
+                    // Get TileComponent (should be on prefab)
                     var tileComponent = tileObject.GetComponent<TileComponent>();
                     if (tileComponent == null)
                     {
-                        tileComponent = tileObject.AddComponent<TileComponent>();
+                        Debug.LogError($"GridGenerator: Tile prefab {tilePrefab.name} must have TileComponent attached");
+                        continue;
                     }
                     tileComponent.Initialize(tile);
                 }
